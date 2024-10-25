@@ -205,9 +205,9 @@ func main() {
 			stationIDs[i] = strings.TrimSpace(stationIDs[i])
 		}
 	}
-	log.Println("Set UserAgent to github.com/jacaudi/wsrif")
+	log.Println("Set UserAgent to https://github.com/jacaudi/wsrif")
 	config := nwsgo.Config{}
-	config.SetUserAgent("github.com/jacaudi/wsrif")
+	config.SetUserAgent("wsrif/1.0 (+https://github.com/jacaudi/wsrif)")
 	fetchAndReportRadarData(stationIDs, radarDataMap)
 
 	ticker := time.NewTicker(time.Duration(minuteInterval) * time.Minute)
