@@ -1,5 +1,5 @@
 # Build Stage
-FROM golang:1.23.2-alpine3.20 AS build
+FROM golang:1.23.2-alpine AS build
 
 # Set necessary environment variables for Go cross-compilation
 ENV CGO_ENABLED=0
