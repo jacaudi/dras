@@ -22,6 +22,7 @@ var (
 
 // RadarData holds radar information, including both the raw VCP and its human-readable translation.
 type RadarData struct {
+	Name        string
 	VCP         string
 	Mode        string
 	Status      string
@@ -46,6 +47,7 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 
 	// Constructing the RadarData structure with both VCP and human-readable translation
 	radarData := &RadarData{
+		Name:        radarResponse.Name,
 		VCP:         radarVCPCode,
 		Mode:        radarMode,
 		Status:      radarResponse.RDA.Properties.Mode,
@@ -126,7 +128,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 		lastRadarData, exists := radarDataMap[stationID]["last"]
 		if !exists || lastRadarData == nil {
 			radarDataMap[stationID]["last"] = newRadarData
-			initialMessage := fmt.Sprintf("%s - %s Mode", stationID, mode)
+			initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
 			log.Printf("Initial radar data stored for station %s.", stationID)
 			if dryrun {
 				log.Printf("Debug Pushover Msg: %s\n", initialMessage)
@@ -140,7 +142,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 
 		changed, changeMessage := compareRadarData(lastRadarData.(*RadarData), newRadarData)
 		if changed {
-			log.Printf("Radar data changed for station %s: %s\n", stationID, changeMessage)
+			log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
 			if dryrun {
 				log.Printf("Debug Pushover Msg: %s\n", changeMessage)
 			} else {
