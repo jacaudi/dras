@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jacaudi/nwsgo"
@@ -14,6 +15,7 @@ import (
 )
 
 var (
+	stationInput      = os.Getenv("STATION_IDS")
 	apiToken          = os.Getenv("PUSHOVER_API_TOKEN")
 	userKey           = os.Getenv("PUSHOVER_USER_KEY")
 	dryrun, _         = strconv.ParseBool(os.Getenv("DRYRUN"))
@@ -160,7 +162,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 // sendPushoverNotification sends a Pushover notification with the given title and message.
 func sendPushoverNotification(title, message string) error {
 	if apiToken == "" || userKey == "" {
-		return fmt.Errorf("pushover API token or user key is not set")
+		log.Fatalf("Pushover API token or user key is not set")
 	}
 
 	// Create a new Pushover service
@@ -185,16 +187,25 @@ func sendPushoverNotification(title, message string) error {
 
 func main() {
 	radarDataMap := make(map[string]map[string]interface{})
-	stationIDs := []string{"KATX", "KRTX"}
+	var stationIDs []string
+
 	if minuteInterval == 0 {
 		minuteInterval = 10
 	}
 
+	log.Println("WSRif -- Start Radar Monitoring Service")
+	if dryrun {
+		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
+	} else {
+		stationIDs = strings.Split(stationInput, ",")
+		if stationInput == "" {
+			errMsg := "Error: STATION_IDS environment variable is not set or is empty"
+			log.Fatalf("%s", errMsg)
+		}
+	}
 	log.Println("Set UserAgent to github.com/jacaudi/wsrif")
 	config := nwsgo.Config{}
 	config.SetUserAgent("github.com/jacaudi/wsrif")
-
-	log.Println("WSRif -- Start Radar Monitoring Service")
 	fetchAndReportRadarData(stationIDs, radarDataMap)
 
 	ticker := time.NewTicker(time.Duration(minuteInterval) * time.Minute)
