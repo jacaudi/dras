@@ -1,0 +1,19 @@
+{
+    "name": "Golang Development",
+    "dockerFile": "dockerfile",
+    "context": ".",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "go.gopath": "/go",
+                "go.useLanguageServer": true
+            },
+            "extensions": [
+                "golang.go",
+                "ms-vscode-remote.remote-containers"
+            ]
+            }
+        },
+    "postCreateCommand": "go mod tidy",
+    "remoteUser": "vscode"
+}

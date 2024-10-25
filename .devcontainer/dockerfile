@@ -1,0 +1,21 @@
+# Go development environment
+FROM public.ecr.aws/docker/library/golang:1.23.2-alpine
+
+# Install necessary tools
+RUN apk add --update --no-cache \
+      bash curl jq
+
+RUN apk add --update git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
+
+# Create a non-root user
+RUN adduser -D -h /home/vscode -s /bin/bash vscode \
+    && echo "vscode ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    
+# Set the user to vscode
+USER vscode
+
+# Set the working directory
+WORKDIR /workspace
+
+# Expose port for debugging
+EXPOSE 8080
