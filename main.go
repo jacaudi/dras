@@ -199,8 +199,7 @@ func main() {
 	} else {
 		stationIDs = strings.Split(stationInput, ",")
 		if stationInput == "" {
-			errMsg := "Error: STATION_IDS environment variable is not set or is empty"
-			log.Fatalf("%s", errMsg)
+			log.Fatalf("Error: STATION_IDS environment variable is not set or is empty")
 		}
 		for i := range stationIDs {
 			stationIDs[i] = strings.TrimSpace(stationIDs[i])
