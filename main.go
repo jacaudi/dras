@@ -136,7 +136,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 				log.Printf("Debug Pushover Msg: %s\n", initialMessage)
 			} else {
 				if err := sendPushoverNotification("WSRif Startup", initialMessage); err != nil {
-					log.Printf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
 			continue
@@ -149,7 +149,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 				log.Printf("Debug Pushover Msg: %s\n", changeMessage)
 			} else {
 				if err := sendPushoverNotification("WSRif Radar Update", changeMessage); err != nil {
-					log.Printf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
 			radarDataMap[stationID]["last"] = newRadarData
@@ -201,6 +201,9 @@ func main() {
 		if stationInput == "" {
 			errMsg := "Error: STATION_IDS environment variable is not set or is empty"
 			log.Fatalf("%s", errMsg)
+		}
+		for i := range stationIDs {
+			stationIDs[i] = strings.TrimSpace(stationIDs[i])
 		}
 	}
 	log.Println("Set UserAgent to github.com/jacaudi/wsrif")
