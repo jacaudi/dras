@@ -1,0 +1,11 @@
+# Directories
+.github/
+.devcontainer/
+.git/
+
+# Files
+.gitignore
+LICENSE
+Dockerfile
+LICENSE
+README.md
