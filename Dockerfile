@@ -1,9 +1,20 @@
 # Build Stage
 FROM golang:1.23.2-alpine AS build
 
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT=""
+
+ARG VERSION="development"
+ARG BUILDTIME=""
+ARG REVISION=""
+
 # Set necessary environment variables for Go cross-compilation
-ENV CGO_ENABLED=0
-ENV GOOS=linux
+ENV GO111MODULE=on \
+    CGO_ENABLED=0 \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
+    GOARM=${TARGETVARIANT}
 
 # Update CA Certs
 RUN apk --update --no-cache add ca-certificates
@@ -29,3 +40,7 @@ COPY --from=build /app/wsrif /wsrif
 
 # Command to run the application
 CMD ["/wsrif"]
+
+LABEL \
+    org.opencontainers.image.title="wsrif" \
+    org.opencontainers.image.source="https://github.com/jacaudi/wsrif"
