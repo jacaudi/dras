@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        uses: ./.github/actions/docker-image
+        uses: ./.github/actions/docker
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
           latest: false
