@@ -34,13 +34,13 @@ RUN go build -o wsrif main.go
 # Final Stage
 FROM scratch AS final
 
+LABEL \
+    org.opencontainers.image.title="wsrif" \
+    org.opencontainers.image.source="https://github.com/jacaudi/wsrif"
+
 # Copy the built binary from the build stage
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /app/wsrif /wsrif
 
 # Command to run the application
 CMD ["/wsrif"]
-
-LABEL \
-    org.opencontainers.image.title="wsrif" \
-    org.opencontainers.image.source="https://github.com/jacaudi/wsrif"
