@@ -1,0 +1,14 @@
+project_name: "wsrif"
+archives:
+  - id: main
+    wrap_in_directory: true
+    files:
+      - "README.md"
+builds:
+  - env: 
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
