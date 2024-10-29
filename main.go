@@ -81,28 +81,28 @@ func radarMode(vcp string) (string, error) {
 func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	if oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" {
-			return false, "The Radar is in Precipitation Mode -- Precipitation Detected"
+			return true, "The Radar is in Precipitation Mode -- Precipitation Detected"
 		} else if newData.VCP == "R215" {
-			return false, "The Radar is in Clear Air Mode -- No Precipitation Detected"
+			return true, "The Radar is in Clear Air Mode -- No Precipitation Detected"
 		} else {
-			return false, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP)
+			return true, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP)
 		}
 	}
 
 	if oldData.Status != newData.Status {
-		return false, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status)
+		return true, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status)
 	}
 
 	if oldData.PowerSource != newData.PowerSource {
-		return false, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource)
+		return true, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource)
 	}
 
 	if oldData.GenState != newData.GenState {
-		return false, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState)
+		return true, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState)
 	}
 
 	if oldData.FuelLevel != newData.FuelLevel {
-		return false, fmt.Sprintf("Fuel level changed from %.2f to %.2f", oldData.FuelLevel, newData.FuelLevel)
+		return true, fmt.Sprintf("Fuel level changed from %.2f to %.2f", oldData.FuelLevel, newData.FuelLevel)
 	}
 
 	return false, ""
