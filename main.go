@@ -30,7 +30,6 @@ type RadarData struct {
 	Status      string
 	PowerSource string
 	GenState    string
-	FuelLevel   float64
 }
 
 // getRadarResponse fetches radar data for a given station and returns a processed RadarData structure.
@@ -55,7 +54,6 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 		Status:      radarResponse.RDA.Properties.Mode,
 		PowerSource: radarResponse.Performance.Properties.PowerSource,
 		GenState:    radarResponse.RDA.Properties.GeneratorState,
-		FuelLevel:   radarResponse.Performance.Properties.FuelLevel.Value,
 	}
 
 	return radarData, nil
@@ -81,9 +79,9 @@ func radarMode(vcp string) (string, error) {
 func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	if oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" {
-			return true, "The Radar is in Precipitation Mode -- Precipitation Detected"
-		} else if newData.VCP == "R215" {
 			return true, "The Radar is in Clear Air Mode -- No Precipitation Detected"
+		} else if newData.VCP == "R215" {
+			return true, "The Radar is in Precipitation Mode -- Precipitation Detected"
 		} else {
 			return true, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP)
 		}
@@ -99,10 +97,6 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 
 	if oldData.GenState != newData.GenState {
 		return true, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState)
-	}
-
-	if oldData.FuelLevel != newData.FuelLevel {
-		return true, fmt.Sprintf("Fuel level changed from %.2f to %.2f", oldData.FuelLevel, newData.FuelLevel)
 	}
 
 	return false, ""
