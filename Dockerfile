@@ -29,18 +29,18 @@ COPY . .
 RUN go mod tidy
 
 # Build the Go application
-RUN go build -o wsrif main.go
+RUN go build -o dras main.go
 
 # Final Stage
 FROM scratch AS final
 
 LABEL \
-    org.opencontainers.image.title="wsrif" \
-    org.opencontainers.image.source="https://github.com/jacaudi/wsrif"
+    org.opencontainers.image.title="dras" \
+    org.opencontainers.image.source="https://github.com/jacaudi/dras"
 
 # Copy the built binary from the build stage
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=build /app/wsrif /wsrif
+COPY --from=build /app/dras /dras
 
 # Command to run the application
-CMD ["/wsrif"]
+CMD ["/dras"]

@@ -129,7 +129,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 			if dryrun {
 				log.Printf("Debug Pushover Msg: %s\n", initialMessage)
 			} else {
-				if err := sendPushoverNotification("WSRif Startup", initialMessage); err != nil {
+				if err := sendPushoverNotification("DRAS Startup", initialMessage); err != nil {
 					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
@@ -142,7 +142,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 			if dryrun {
 				log.Printf("Debug Pushover Msg: %s\n", changeMessage)
 			} else {
-				if err := sendPushoverNotification("WSRif Radar Update", changeMessage); err != nil {
+				if err := sendPushoverNotification("DRAS Radar Update", changeMessage); err != nil {
 					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
@@ -175,7 +175,7 @@ func sendPushoverNotification(title, message string) error {
 		return err
 	}
 
-	log.Println("Notification sent successfully!")
+	log.Println("Pushover notification sent successfully!")
 	return nil
 }
 
@@ -187,7 +187,7 @@ func main() {
 		minuteInterval = 10
 	}
 
-	log.Println("WSRif -- Start Radar Monitoring Service")
+	log.Println("DRAS -- Start Monitoring Service")
 	if dryrun {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
 	} else {
@@ -199,16 +199,16 @@ func main() {
 			stationIDs[i] = strings.TrimSpace(stationIDs[i])
 		}
 	}
-	log.Println("Set UserAgent to https://github.com/jacaudi/wsrif")
+	log.Println("Set UserAgent to https://github.com/jacaudi/dras")
 	config := nwsgo.Config{}
-	config.SetUserAgent("wsrif/1.0 (+https://github.com/jacaudi/wsrif)")
+	config.SetUserAgent("dras/1.0 (+https://github.com/jacaudi/dras)")
 	fetchAndReportRadarData(stationIDs, radarDataMap)
 
 	ticker := time.NewTicker(time.Duration(minuteInterval) * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		log.Println("WSRif -- Updating Radar Data")
+		log.Println("DRAS -- Updating Radar Data")
 		fetchAndReportRadarData(stationIDs, radarDataMap)
 	}
 }

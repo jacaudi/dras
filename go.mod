@@ -1,4 +1,4 @@
-module github.com/jacaudi/wsrif
+module github.com/jacaudi/dras
 
 go 1.23.2
 

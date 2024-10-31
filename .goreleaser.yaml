@@ -1,4 +1,4 @@
-project_name: "wsrif"
+project_name: "dras"
 archives:
   - id: main
     wrap_in_directory: true
