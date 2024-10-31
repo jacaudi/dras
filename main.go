@@ -24,19 +24,20 @@ var (
 
 func init() {
 	var missingVars []string
+	if !dryrun {
+		if stationInput == "" {
+			missingVars = append(missingVars, "STATION_IDS")
+		}
+		if apiToken == "" {
+			missingVars = append(missingVars, "PUSHOVER_API_TOKEN")
+		}
+		if userKey == "" {
+			missingVars = append(missingVars, "PUSHOVER_USER_KEY")
+		}
 
-	if stationInput == "" {
-		missingVars = append(missingVars, "STATION_IDS")
-	}
-	if apiToken == "" {
-		missingVars = append(missingVars, "PUSHOVER_API_TOKEN")
-	}
-	if userKey == "" {
-		missingVars = append(missingVars, "PUSHOVER_USER_KEY")
-	}
-
-	if len(missingVars) > 0 {
-		log.Fatalf("The following environment variables are not set: %s", strings.Join(missingVars, ", "))
+		if len(missingVars) > 0 {
+			log.Fatalf("The following environment variables are not set: %s", strings.Join(missingVars, ", "))
+		}
 	}
 }
 
