@@ -22,6 +22,20 @@ var (
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
 )
 
+func init() {
+	if !dryrun {
+		if stationInput == "" {
+			log.Fatalf("STATION_IDS is not set")
+		}
+		if apiToken == "" {
+			log.Fatalf("PUSHOVER_API_TOKEN is not set")
+		}
+		if userKey == "" {
+			log.Fatalf("PUSHOVER_USER_KEY is not set")
+		}
+	}
+}
+
 // RadarData holds radar information, including both the raw VCP and its human-readable translation.
 type RadarData struct {
 	Name        string
@@ -155,9 +169,6 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 
 // sendPushoverNotification sends a Pushover notification with the given title and message.
 func sendPushoverNotification(title, message string) error {
-	if apiToken == "" || userKey == "" {
-		log.Fatalf("Pushover API token or user key is not set")
-	}
 
 	// Create a new Pushover service
 	pushoverService := pushover.New(apiToken)
@@ -192,9 +203,6 @@ func main() {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
 	} else {
 		stationIDs = strings.Split(stationInput, ",")
-		if stationInput == "" {
-			log.Fatalf("Error: STATION_IDS environment variable is not set or is empty")
-		}
 		for i := range stationIDs {
 			stationIDs[i] = strings.TrimSpace(stationIDs[i])
 		}
