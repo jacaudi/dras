@@ -161,7 +161,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 			if dryrun {
 				log.Printf("Debug Pushover Msg: %s\n", changeMessage)
 			} else {
-				if err := sendPushoverNotification("DRAS Radar Update", changeMessage); err != nil {
+				if err := sendPushoverNotification("DRAS Update", changeMessage); err != nil {
 					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
