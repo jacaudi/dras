@@ -23,7 +23,3 @@ release:
     owner: user
     name: repo
   name_template: "{{ .Tag }}"
-  body: |
-      {{ .Changelog }}
-      The following Docker images are available for this release:
-      - `docker pull ghcr.io/jacaudi/dras:{{ .Version }}`
