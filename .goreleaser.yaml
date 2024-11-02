@@ -14,7 +14,8 @@ builds:
       - amd64
       - arm64
 changelog:
-  use: git
   sort: asc
-  format: "{{.SHA}}: {{.Message}} (@{{.AuthorUsername}})"
-  abbrev: -1
+release:
+  github:
+    owner: jacaudi
+    name: dras
