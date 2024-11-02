@@ -12,3 +12,24 @@ builds:
     goarch:
       - amd64
       - arm64
+changelog:
+  use: github
+  sort: asc
+  format: "{{.SHA}}: {{.Message}} (@{{.AuthorUsername}})"
+  abbrev: -1
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "Maintenance"
+      regexp: '^.*?chore(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Documentation
+      regex: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "CI"
+      regex: '^.*?ci(\([[:word:]]+\))??!?:.+$'
+      order: 4
