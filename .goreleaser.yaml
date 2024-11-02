@@ -14,12 +14,7 @@ builds:
       - amd64
       - arm64
 changelog:
-  use: github
+  use: git
   sort: asc
   format: "{{.SHA}}: {{.Message}} (@{{.AuthorUsername}})"
   abbrev: -1
-release: 
-  github:
-    owner: user
-    name: repo
-  name_template: "{{ .Tag }}"
