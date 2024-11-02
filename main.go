@@ -22,6 +22,17 @@ var (
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
 )
 
+// RadarData holds radar information, including both the raw VCP and its human-readable translation.
+type RadarData struct {
+	Name        string
+	VCP         string
+	Mode        string
+	Status      string
+	PowerSource string
+	GenState    string
+}
+
+// init ensures that required environmental variables have been set.
 func init() {
 	var missingVars []string
 	if !dryrun {
@@ -39,16 +50,6 @@ func init() {
 			log.Fatalf("The following environment variables are not set: %s", strings.Join(missingVars, ", "))
 		}
 	}
-}
-
-// RadarData holds radar information, including both the raw VCP and its human-readable translation.
-type RadarData struct {
-	Name        string
-	VCP         string
-	Mode        string
-	Status      string
-	PowerSource string
-	GenState    string
 }
 
 // getRadarResponse fetches radar data for a given station and returns a processed RadarData structure.
