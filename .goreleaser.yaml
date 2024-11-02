@@ -1,10 +1,7 @@
+---
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
-project_name: "dras"
-archives:
-  - id: main
-    wrap_in_directory: true
-    files:
-      - "README.md"
+project_name: dras
 builds:
   - env: 
       - CGO_ENABLED=0
@@ -13,9 +10,9 @@ builds:
     goarch:
       - amd64
       - arm64
+archives:
+  - name_template: "{{.ProjectName}}_{{.Os}}_{{.Arch}}"
+checksum:
+  name_template: "checksums.txt"
 changelog:
   sort: asc
-release:
-  github:
-    owner: jacaudi
-    name: dras
