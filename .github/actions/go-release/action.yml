@@ -12,6 +12,7 @@ runs:
   steps:
     - name: Checkout
       uses: actions/checkout@4
+      with:
         fetch-depth: 0
 
     - name: Install Go
