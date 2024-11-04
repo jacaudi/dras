@@ -147,7 +147,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 			initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
 			log.Printf("Initial radar data stored for station %s.", stationID)
 			if dryrun {
-				log.Printf("Debug Pushover Msg: %s\n", initialMessage)
+				log.Printf("Debug Pushover -- Title: DRAS Startup - Msg: %s\n", initialMessage)
 			} else {
 				if err := sendPushoverNotification("DRAS Startup", initialMessage); err != nil {
 					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
@@ -160,9 +160,9 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 		if changed {
 			log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
 			if dryrun {
-				log.Printf("Debug Pushover Msg: %s\n", changeMessage)
+				log.Printf("Debug Pushover -- Title: %s - Msg: %s\n", stationID, changeMessage)
 			} else {
-				if err := sendPushoverNotification("DRAS Update", changeMessage); err != nil {
+				if err := sendPushoverNotification(fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
 					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 				}
 			}
