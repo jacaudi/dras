@@ -3,7 +3,7 @@ module github.com/jacaudi/dras
 go 1.23.2
 
 require (
-	github.com/jacaudi/nwsgo v0.0.2
+	github.com/jacaudi/nwsgo v0.0.3
 	github.com/nikoksr/notify v1.0.0
 )
 
