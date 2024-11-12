@@ -110,26 +110,32 @@ func radarMode(vcp string) (string, error) {
 
 // compareRadarData compares two RadarData objects and returns a detailed message if they are different.
 func compareRadarData(oldData, newData *RadarData) (bool, string) {
+	var changes []string
+
 	if oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" {
-			return true, "The Radar is in Clear Air Mode -- No Precipitation Detected"
+			changes = append(changes, "The Radar is in Clear Air Mode -- No Precipitation Detected")
 		} else if newData.VCP == "R215" {
-			return true, "The Radar is in Precipitation Mode -- Precipitation Detected"
+			changes = append(changes, "The Radar is in Precipitation Mode -- Precipitation Detected")
 		} else {
-			return true, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP)
+			changes = append(changes, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP))
 		}
 	}
 
 	if oldData.Status != newData.Status {
-		return true, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status)
+		changes = append(changes, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status))
 	}
 
 	if oldData.PowerSource != newData.PowerSource {
-		return true, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource)
+		changes = append(changes, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource))
 	}
 
 	if oldData.GenState != newData.GenState {
-		return true, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState)
+		changes = append(changes, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState))
+	}
+
+	if len(changes) > 0 {
+		return true, strings.Join(changes, "\n")
 	}
 
 	return false, ""
