@@ -141,6 +141,29 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	return false, ""
 }
 
+// sendPushoverNotification sends a Pushover notification with the given title and message.
+func sendPushoverNotification(title, message string) error {
+
+	// Create a new Pushover service
+	pushoverService := pushover.New(apiToken)
+
+	// Add a recipient
+	pushoverService.AddReceivers(userKey)
+
+	// Create a new notification
+	notification := notify.New()
+	notification.UseServices(pushoverService)
+
+	// Send the notification
+	err := notification.Send(context.Background(), title, message)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Pushover notification sent successfully!")
+	return nil
+}
+
 func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -204,29 +227,6 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 	}
 
 	wg.Wait()
-}
-
-// sendPushoverNotification sends a Pushover notification with the given title and message.
-func sendPushoverNotification(title, message string) error {
-
-	// Create a new Pushover service
-	pushoverService := pushover.New(apiToken)
-
-	// Add a recipient
-	pushoverService.AddReceivers(userKey)
-
-	// Create a new notification
-	notification := notify.New()
-	notification.UseServices(pushoverService)
-
-	// Send the notification
-	err := notification.Send(context.Background(), title, message)
-	if err != nil {
-		return err
-	}
-
-	log.Println("Pushover notification sent successfully!")
-	return nil
 }
 
 func main() {
