@@ -164,6 +164,10 @@ func sendPushoverNotification(title, message string) error {
 	return nil
 }
 
+// fetchAndReportRadarData fetches radar data for a list of station IDs and reports any changes in the data.
+// The fetched data is compared with the last stored data for each station ID, and if there are changes a push notification is sent using the sendPushoverNotification function.
+// The radar data and its mode are stored in the radarDataMap in memory.
+// Goroutines are used to perform the api call and data processing per station ID
 func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
