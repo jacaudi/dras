@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jacaudi/nwsgo"
@@ -50,6 +52,17 @@ func init() {
 			log.Fatalf("The following environment variables are not set: %s", strings.Join(missingVars, ", "))
 		}
 	}
+}
+
+// sanitizeStationIDs looks for any station ID input and attempts to pass only the ID
+func sanitizeStationIDs(stationInput string) []string {
+	// Define a regular expression to split by space, comma, or semicolon
+	re := regexp.MustCompile(`[ ,;]+`)
+	stationIDs := re.Split(stationInput, -1)
+	for i := range stationIDs {
+		stationIDs[i] = strings.TrimSpace(stationIDs[i])
+	}
+	return stationIDs
 }
 
 // getRadarResponse fetches radar data for a given station and returns a processed RadarData structure.
@@ -123,54 +136,68 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 }
 
 func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}) {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
 	for _, stationID := range stationIDs {
-		log.Printf("Fetching radar data for station: %s\n", stationID)
-		newRadarData, err := getRadarResponse(stationID)
-		if err != nil {
-			log.Printf("Error fetching radar data for station %s: %v\n", stationID, err)
-			continue
-		}
-
-		mode, err := radarMode(newRadarData.VCP)
-		if err != nil {
-			log.Printf("Error determining radar mode for station %s: %v\n", stationID, err)
-			continue
-		}
-
-		if _, exists := radarDataMap[stationID]; !exists {
-			radarDataMap[stationID] = make(map[string]interface{})
-		}
-
-		lastRadarData, exists := radarDataMap[stationID]["last"]
-		if !exists || lastRadarData == nil {
-			radarDataMap[stationID]["last"] = newRadarData
-			initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
-			log.Printf("Initial radar data stored for station %s.", stationID)
-			if dryrun {
-				log.Printf("Debug Pushover -- Title: DRAS Startup - Msg: %s\n", initialMessage)
-			} else {
-				if err := sendPushoverNotification("DRAS Startup", initialMessage); err != nil {
-					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
-				}
+		wg.Add(1)
+		go func(stationID string) {
+			defer wg.Done()
+			log.Printf("Fetching radar data for station: %s\n", stationID)
+			newRadarData, err := getRadarResponse(stationID)
+			if err != nil {
+				log.Printf("Error fetching radar data for station %s: %v\n", stationID, err)
+				return
 			}
-			continue
-		}
 
-		changed, changeMessage := compareRadarData(lastRadarData.(*RadarData), newRadarData)
-		if changed {
-			log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
-			if dryrun {
-				log.Printf("Debug Pushover -- Title: %s - Msg: %s\n", stationID, changeMessage)
-			} else {
-				if err := sendPushoverNotification(fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
-					log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
-				}
+			mode, err := radarMode(newRadarData.VCP)
+			if err != nil {
+				log.Printf("Error determining radar mode for station %s: %v\n", stationID, err)
+				return
 			}
-			radarDataMap[stationID]["last"] = newRadarData
-		} else {
-			log.Printf("No changes in radar data for station %s\n", stationID)
-		}
+
+			mu.Lock()
+			if _, exists := radarDataMap[stationID]; !exists {
+				radarDataMap[stationID] = make(map[string]interface{})
+			}
+
+			lastRadarData, exists := radarDataMap[stationID]["last"]
+			if !exists || lastRadarData == nil {
+				radarDataMap[stationID]["last"] = newRadarData
+				mu.Unlock()
+				initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
+				log.Printf("Initial radar data stored for station %s.", stationID)
+				if dryrun {
+					log.Printf("Debug Pushover -- Title: DRAS Startup - Msg: %s\n", initialMessage)
+				} else {
+					if err := sendPushoverNotification("DRAS Startup", initialMessage); err != nil {
+						log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					}
+				}
+				return
+			}
+			mu.Unlock()
+
+			changed, changeMessage := compareRadarData(lastRadarData.(*RadarData), newRadarData)
+			if changed {
+				log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
+				if dryrun {
+					log.Printf("Debug Pushover -- Title: %s - Msg: %s\n", stationID, changeMessage)
+				} else {
+					if err := sendPushoverNotification(fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
+						log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					}
+				}
+				mu.Lock()
+				radarDataMap[stationID]["last"] = newRadarData
+				mu.Unlock()
+			} else {
+				log.Printf("No changes in radar data for station %s\n", stationID)
+			}
+		}(stationID)
 	}
+
+	wg.Wait()
 }
 
 // sendPushoverNotification sends a Pushover notification with the given title and message.
@@ -208,10 +235,7 @@ func main() {
 	if dryrun {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
 	} else {
-		stationIDs = strings.Split(stationInput, ",")
-		for i := range stationIDs {
-			stationIDs[i] = strings.TrimSpace(stationIDs[i])
-		}
+		stationIDs = sanitizeStationIDs(stationInput)
 	}
 	log.Println("Set UserAgent to https://github.com/jacaudi/dras")
 	config := nwsgo.Config{}
