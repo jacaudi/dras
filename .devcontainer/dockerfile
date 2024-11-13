@@ -2,9 +2,7 @@
 FROM public.ecr.aws/docker/library/golang:1.23.2-alpine
 
 # Install necessary tools
-RUN apk add --update --no-cache \
-      bash curl jq
-
+RUN apk add --update --no-cache bash curl jq
 RUN apk add --update git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
 
 # Create a non-root user
@@ -13,6 +11,9 @@ RUN adduser -D -h /home/vscode -s /bin/bash vscode \
     
 # Set the user to vscode
 USER vscode
+
+# Install Go binary packages
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Set the working directory
 WORKDIR /workspace
