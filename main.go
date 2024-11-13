@@ -34,8 +34,8 @@ type RadarData struct {
 	GenState    string
 }
 
-// init ensures that required environmental variables have been set.
-func init() {
+// checkEnvVars ensures that required environmental variables have been set.
+func checkEnvVars() {
 	var missingVars []string
 	if !dryrun {
 		if stationInput == "" {
@@ -234,6 +234,7 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 }
 
 func main() {
+	checkEnvVars()
 	radarDataMap := make(map[string]map[string]interface{})
 	var stationIDs []string
 
