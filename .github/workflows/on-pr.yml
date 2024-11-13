@@ -17,6 +17,7 @@ jobs:
 
       - name: Lint
         uses: ./.github/actions/lint
+        
   tests:
     runs-on: ubuntu-latest
     steps:

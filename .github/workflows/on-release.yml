@@ -17,6 +17,7 @@ jobs:
         uses: ./.github/actions/docker
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
+          latest: true
 
   release-binaries:
     runs-on: ubuntu-latest

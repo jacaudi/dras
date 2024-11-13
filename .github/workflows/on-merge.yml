@@ -24,15 +24,3 @@ jobs:
 
       - name: Lint
         uses: ./.github/actions/lint
-
-  release-image:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build
-        uses: ./.github/actions/docker
-        with:
-          token: "${{ secrets.GITHUB_TOKEN }}"
-          latest: false
