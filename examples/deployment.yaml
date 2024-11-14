@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dras-deployment
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dras
+  template:
+    metadata:
+      labels:
+        app: dras
+    spec:
+      containers:
+      - name: ghcr.io/jacaudi/dras
+        image: :v1.0.0
+          envFrom:
+            configMapRef:
+              name: dras-config
+            secretRef:
+              name: dras-secret
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dras-config
+  namespace: default
+data:
+  STATION_IDS: KRAX
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dras-secret
+  namespace: default
+type: Opaque
+stringData:
+  PUSHOVER_USER_KEY: <KEY>
+  PUSHOVER_API_TOKEN: <TOKEN>
