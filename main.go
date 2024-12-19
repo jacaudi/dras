@@ -134,17 +134,20 @@ func radarMode(vcp string) (string, error) {
 // It compiles the patterns in the replacements map into regular expressions and performs the replacements.
 // The function returns the modified input string and an error if any.
 func replacePhrases(input string, replacements map[string]string) (string, error) {
+	compiledReplacements := make(map[*regexp.Regexp]string)
 	for pattern, replacement := range replacements {
 		escapedPattern := regexp.QuoteMeta(pattern)
 		re, err := regexp.Compile(escapedPattern)
 		if err != nil {
 			return "", fmt.Errorf("failed to compile pattern %s: %w", pattern, err)
 		}
-		if re.MatchString(input) {
-			input = re.ReplaceAllString(input, replacement)
-			break
-		}
+		compiledReplacements[re] = replacement
 	}
+
+	for re, replacement := range compiledReplacements {
+		input = re.ReplaceAllString(input, replacement)
+	}
+
 	return input, nil
 }
 
