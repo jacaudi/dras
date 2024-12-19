@@ -1,5 +1,5 @@
 # Go development environment
-FROM public.ecr.aws/docker/library/golang:1.23.2-alpine
+FROM public.ecr.aws/docker/library/golang:1.23.4-alpine
 
 # Install necessary tools
 RUN apk add --update --no-cache bash curl jq
