@@ -24,7 +24,7 @@ var (
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
 )
 
-// Define a map with phrases to replace for the PowerSource struct
+// Define a map with phrases to replace for the GenState struct
 var replacements = map[string]string{
 	"Switched to Auxiliary Power|Utility PWR Available|Generator On": "On",
 	"Switched to Auxiliary Power|Generator On":                       "On",
@@ -32,17 +32,18 @@ var replacements = map[string]string{
 	"Utility PWR Available":                                          "Off",
 }
 
-// RadarData holds radar information, including both the raw VCP and its human-readable translation.
+// RadarData represents the data for a radar.
 type RadarData struct {
-	Name        string
-	VCP         string
-	Mode        string
-	Status      string
-	PowerSource string
-	GenState    string
+	Name        string // Name of the radar.
+	VCP         string // Volume Coverage Pattern of the radar.
+	Mode        string // Scanning mode of the radar.
+	Status      string // Status of the radar.
+	PowerSource string // Power source of the radar.
+	GenState    string // General state of the radar.
 }
 
-// checkEnvVars ensures that required environmental variables have been set.
+// checkEnvVars checks if the required environment variables are set.
+// If any of the required variables are missing, it logs a fatal error.
 func checkEnvVars() {
 	var missingVars []string
 	if !dryrun {
@@ -62,7 +63,8 @@ func checkEnvVars() {
 	}
 }
 
-// sanitizeStationIDs looks for any station ID input and attempts to pass only the ID
+// sanitizeStationIDs splits a string of station IDs by space, comma, or semicolon
+// and returns a slice of sanitized station IDs.
 func sanitizeStationIDs(stationInput string) []string {
 	// Define a regular expression to split by space, comma, or semicolon
 	re := regexp.MustCompile(`[ ,;]+`)
@@ -73,7 +75,8 @@ func sanitizeStationIDs(stationInput string) []string {
 	return stationIDs
 }
 
-// getRadarResponse fetches radar data for a given station and returns a processed RadarData structure.
+// getRadarResponse retrieves radar data for a given station ID.
+// It returns a pointer to a RadarData struct and an error if any.
 func getRadarResponse(stationID string) (*RadarData, error) {
 	radarResponse, err := nwsgo.RadarStation(stationID)
 	if err != nil {
@@ -107,8 +110,9 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 	return radarData, nil
 }
 
-// Data Transformation
-// radarMode converts a VCP code into a human-readable radar mode description.
+// radarMode returns the radar mode based on the given VCP (Volume Coverage Pattern) code.
+// It maps specific VCP codes to corresponding radar modes.
+// If the VCP code is not recognized, it returns an error.
 func radarMode(vcp string) (string, error) {
 	var radarMode string
 
@@ -126,8 +130,9 @@ func radarMode(vcp string) (string, error) {
 	return radarMode, nil
 }
 
-// Data Transformation
-// replacePhrases replaces phrases in the input string based on the replacements map.
+// replacePhrases replaces phrases in the input string based on the provided replacements map.
+// It compiles the patterns in the replacements map into regular expressions and performs the replacements.
+// The function returns the modified input string and an error if any.
 func replacePhrases(input string, replacements map[string]string) (string, error) {
 	for pattern, replacement := range replacements {
 		escapedPattern := regexp.QuoteMeta(pattern)
@@ -143,7 +148,8 @@ func replacePhrases(input string, replacements map[string]string) (string, error
 	return input, nil
 }
 
-// compareRadarData compares two RadarData objects and returns a detailed message if they are different.
+// compareRadarData compares the old and new radar data and returns whether there are any changes and the details of the changes.
+// It takes two pointers to RadarData structs as input and returns a boolean indicating if there are any changes and a string containing the details of the changes.
 func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	var changes []string
 
@@ -176,7 +182,9 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	return false, ""
 }
 
-// sendPushoverNotification sends a Pushover notification with the given title and message.
+// sendPushoverNotification sends a Pushover notification with the specified title and message.
+// It uses the Pushover service to send the notification.
+// The function returns an error if the notification fails to send, otherwise it returns nil.
 func sendPushoverNotification(title, message string) error {
 
 	// Create a new Pushover service
@@ -269,6 +277,12 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 	wg.Wait()
 }
 
+// The program checks environment variables, initializes variables, and starts the monitoring service.
+// If the minuteInterval is not set, it defaults to 10 minutes.
+// If dryrun is enabled, it uses test radar sites for monitoring.
+// Otherwise, it sanitizes the station IDs provided by the user.
+// It sets the UserAgent to the DRAS GitHub repository and fetches and reports radar data.
+// It then starts a ticker to periodically update the radar data.
 func main() {
 	checkEnvVars()
 	radarDataMap := make(map[string]map[string]interface{})
