@@ -1,38 +1,38 @@
 [![On Merge](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml) [![Versioned Release](https://github.com/jacaudi/dras/actions/workflows/on-release.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-release.yml) [![Renovate](https://github.com/jacaudi/dras/actions/workflows/renovate.yaml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/renovate.yaml)
 
 # DRAS — Doppler Radar Notification Service
- 
+
  This programs monitors either a single, or multiple, WSR-88D sites and sends alerts via Pushover based on change in status.
 
- ## What Is Monitored
+## What Is Monitored
 
  The following attributes are monitored per each site
 
- - Volume Coverage Pattern (VCP) — Clear Air or Precipitation Mode
- - Operational Status
- - Power Source
- - Generator State
- 
- ## How To Use
+- Volume Coverage Pattern (VCP) — Clear Air or Precipitation Mode
+- Operational Status
+- Power Source
+- Generator State
 
- ### Requirements
+## How To Use
 
- - Pushover Account
- - A device with the pushover mobile application installed
+### Requirements
 
- ### Binary Method
+- Pushover Account
+- A device with the pushover mobile application installed
 
- 1. Assuming you have Go installed on your system, head over to the Github [Releases](https://github.com/jacaudi/dras/releases) and grab the URL to the latest release. 
+### Binary Method
+
+ 1. Assuming you have Go installed on your system, head over to the Github [Releases](https://github.com/jacaudi/dras/releases) and grab the URL to the latest release.
  2. Run go install URL (e.g. `go install github.com/jacaudi/dras@v1.0.0`)
  3. Be sure to set the following Environmental Variables
     - `STATION_IDS` — WSR-88D (Radar) Sites (e.g. KRAX - Raleigh/Durham)
     - `PUSHOVER_USER_KEY` — Your Pushover User Key
     - `PUSHOVER_API_TOKEN` — Your Pushover API Token
- 4. Enjoy! 
+ 4. Enjoy!
 
 ### Standalone Container Method
 
-```
+```bash
 docker pull ghcr.io/jacaudi/dras:v1.0.0
 
 docker run -d \
