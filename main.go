@@ -24,6 +24,14 @@ var (
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
 )
 
+// Define a map with phrases to replace for the PowerSource struct
+var replacements = map[string]string{
+	"Switched to Auxiliary Power|Utility PWR Available|Generator On": "Auxiliary -- Generator: On | Utility Available",
+	"Switched to Auxiliary Power|Generator On":                       "Auxiliary -- Generator: On",
+	"Utility PWR Available|Generator On":                             "Primary -- Generator: On",
+	"Utility PWR Available":                                          "Primary",
+}
+
 // RadarData holds radar information, including both the raw VCP and its human-readable translation.
 type RadarData struct {
 	Name        string
