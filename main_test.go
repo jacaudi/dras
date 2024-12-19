@@ -61,3 +61,42 @@ func TestCompareRadarData(t *testing.T) {
 	assert.Contains(t, message, "Power source changed from Commercial to Backup")
 	assert.Contains(t, message, "Generator state changed from Running to Stopped")
 }
+
+// TestReplacePhrases function
+func TestReplacePhrases(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "Switched to Auxiliary Power|Utility PWR Available|Generator On",
+			expected: "On",
+		},
+		{
+			input:    "Utility PWR Available|Generator On",
+			expected: "On",
+		},
+		{
+			input:    "Utility PWR Available",
+			expected: "Off",
+		},
+		{
+			input:    "No match here",
+			expected: "No match here",
+		},
+		{
+			input:    "Switched to Auxiliary Power|Generator On",
+			expected: "On",
+		},
+	}
+
+	for _, test := range tests {
+		output, err := replacePhrases(test.input, replacements)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if output != test.expected {
+			t.Errorf("expected %q, got %q", test.expected, output)
+		}
+	}
+}
