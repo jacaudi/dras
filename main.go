@@ -80,9 +80,16 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 		return nil, fmt.Errorf("failed to get RADAR data for station %q: %w", stationID, err)
 	}
 
-	// Fetching radar properties
+	// Fetching radar VCP and determine mode
 	radarVCPCode := radarResponse.RDA.Properties.VolumeCoveragePattern
 	radarMode, err := radarMode(radarVCPCode) // Converting VCP to readable mode
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetching radar VCP and determine mode
+	powerSourceResponse := radarResponse.Performance.Properties.PowerSource
+	powerSourceStatement, err := replacePhrases(powerSourceResponse, replacements) // Converting Power Source Repose to understandable text
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +100,7 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 		VCP:         radarVCPCode,
 		Mode:        radarMode,
 		Status:      radarResponse.RDA.Properties.Mode,
-		PowerSource: radarResponse.Performance.Properties.PowerSource,
+		PowerSource: powerSourceStatement,
 		GenState:    radarResponse.RDA.Properties.GeneratorState,
 	}
 
@@ -114,6 +121,15 @@ func radarMode(vcp string) (string, error) {
 	}
 
 	return radarMode, nil
+}
+
+// replacePhrases replaces phrases in the input string based on the replacements map.
+func replacePhrases(input string, replacements map[string]string) (string, error) {
+	for pattern, replacement := range replacements {
+		re := regexp.MustCompile(pattern)
+		input = re.ReplaceAllString(input, replacement)
+	}
+	return input, nil
 }
 
 // compareRadarData compares two RadarData objects and returns a detailed message if they are different.
