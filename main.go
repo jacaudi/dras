@@ -89,7 +89,7 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 
 	// Fetching radar VCP and determine mode
 	genStateResponse := radarResponse.RDA.Properties.GeneratorState
-	genStateStatement, err := replacePhrases(genStateResponse, replacements) // Converting Power Source Repose to understandable text
+	genStateStatement, err := replacePhrases(genStateResponse, replacements) // Converting generator state response to understandable text
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,6 @@ func main() {
 
 	ticker := time.NewTicker(time.Duration(minuteInterval) * time.Minute)
 	defer ticker.Stop()
-
 	for range ticker.C {
 		log.Println("DRAS -- Updating Radar Data")
 		fetchAndReportRadarData(stationIDs, radarDataMap)
