@@ -62,41 +62,26 @@ func TestCompareRadarData(t *testing.T) {
 	assert.Contains(t, message, "Generator state changed from Running to Stopped")
 }
 
-// TestReplacePhrases function
-func TestReplacePhrases(t *testing.T) {
+func TestGenStateSimp(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected string
+		genInput  string
+		expected  string
+		expectErr bool
 	}{
-		{
-			input:    "Switched to Auxiliary Power|Utility PWR Available|Generator On",
-			expected: "On",
-		},
-		{
-			input:    "Utility PWR Available|Generator On",
-			expected: "On",
-		},
-		{
-			input:    "Utility PWR Available",
-			expected: "Off",
-		},
-		{
-			input:    "No match here",
-			expected: "No match here",
-		},
-		{
-			input:    "Switched to Auxiliary Power|Generator On",
-			expected: "On",
-		},
+		{"Switched to Auxiliary Power|Utility PWR Available|Generator On", "On", false},
+		{"Switched to Auxiliary Power|Generator On", "On", false},
+		{"Utility PWR Available|Generator On", "On", false},
+		{"Utility PWR Available", "Off", false},
+		{"Unknown Input", "", true},
 	}
 
 	for _, test := range tests {
-		output, err := replacePhrases(test.input, replacements)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if output != test.expected {
-			t.Errorf("expected %q, got %q", test.expected, output)
+		result, err := genStateSimp(test.genInput)
+		if test.expectErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, result)
 		}
 	}
 }

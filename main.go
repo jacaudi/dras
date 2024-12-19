@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -23,14 +24,6 @@ var (
 	dryrun, _         = strconv.ParseBool(os.Getenv("DRYRUN"))
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
 )
-
-// Define a map with phrases to replace for the GenState struct
-var replacements = map[string]string{
-	"Switched to Auxiliary Power|Utility PWR Available|Generator On": "On",
-	"Switched to Auxiliary Power|Generator On":                       "On",
-	"Utility PWR Available|Generator On":                             "On",
-	"Utility PWR Available":                                          "Off",
-}
 
 // RadarData represents the data for a radar.
 type RadarData struct {
@@ -92,7 +85,7 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 
 	// Fetching radar VCP and determine mode
 	genStateResponse := radarResponse.RDA.Properties.GeneratorState
-	genStateStatement, err := replacePhrases(genStateResponse, replacements) // Converting generator state response to understandable text
+	genStateStatement, err := genStateSimp(genStateResponse) // Converting generator state response to understandable text
 	if err != nil {
 		return nil, err
 	}
@@ -130,25 +123,23 @@ func radarMode(vcp string) (string, error) {
 	return radarMode, nil
 }
 
-// replacePhrases replaces phrases in the input string based on the provided replacements map.
-// It compiles the patterns in the replacements map into regular expressions and performs the replacements.
-// The function returns the modified input string and an error if any.
-func replacePhrases(input string, replacements map[string]string) (string, error) {
-	compiledReplacements := make(map[*regexp.Regexp]string)
+// genStateSimp generates the simplified generator state based on the given input.
+// It takes a genInput string as input and returns the corresponding genState string and an error (if any).
+func genStateSimp(input string) (string, error) {
+	replacements := map[string]string{
+		"Switched to Auxiliary Power|Utility PWR Available|Generator On": "On",
+		"Switched to Auxiliary Power|Generator On":                       "On",
+		"Utility PWR Available|Generator On":                             "On",
+		"Utility PWR Available":                                          "Off",
+	}
+
 	for pattern, replacement := range replacements {
-		escapedPattern := regexp.QuoteMeta(pattern)
-		re, err := regexp.Compile(escapedPattern)
-		if err != nil {
-			return "", fmt.Errorf("failed to compile pattern %s: %w", pattern, err)
+		if input == pattern {
+			return replacement, nil
 		}
-		compiledReplacements[re] = replacement
 	}
 
-	for re, replacement := range compiledReplacements {
-		input = re.ReplaceAllString(input, replacement)
-	}
-
-	return input, nil
+	return "", errors.New("unknown input")
 }
 
 // compareRadarData compares the old and new radar data and returns whether there are any changes and the details of the changes.
