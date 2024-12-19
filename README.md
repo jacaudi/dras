@@ -1,3 +1,5 @@
+[![On Merge](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml) [![Versioned Release](https://github.com/jacaudi/dras/actions/workflows/on-release.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-release.yml) [![Renovate](https://github.com/jacaudi/dras/actions/workflows/renovate.yaml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/renovate.yaml)
+
 # DRAS — Doppler Radar Notification Service
  
  This programs monitors either a single, or multiple, WSR-88D sites and sends alerts via Pushover based on change in status.
