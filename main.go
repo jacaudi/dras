@@ -114,6 +114,8 @@ func radarMode(vcp string) (string, error) {
 	switch vcp {
 	case "R35":
 		radarMode = "Clear Air"
+	case "R212":
+		radarMode = "Precipitation"
 	case "R215":
 		radarMode = "Precipitation"
 	default:
