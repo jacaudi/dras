@@ -26,10 +26,10 @@ var (
 
 // Define a map with phrases to replace for the PowerSource struct
 var replacements = map[string]string{
-	"Switched to Auxiliary Power|Utility PWR Available|Generator On": "Auxiliary -- Generator: On | Utility Available",
-	"Switched to Auxiliary Power|Generator On":                       "Auxiliary -- Generator: On",
-	"Utility PWR Available|Generator On":                             "Primary -- Generator: On",
-	"Utility PWR Available":                                          "Primary",
+	"Switched to Auxiliary Power|Utility PWR Available|Generator On": "On",
+	"Switched to Auxiliary Power|Generator On":                       "On",
+	"Utility PWR Available|Generator On":                             "On",
+	"Utility PWR Available":                                          "Off",
 }
 
 // RadarData holds radar information, including both the raw VCP and its human-readable translation.
@@ -88,8 +88,8 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 	}
 
 	// Fetching radar VCP and determine mode
-	powerSourceResponse := radarResponse.Performance.Properties.PowerSource
-	powerSourceStatement, err := replacePhrases(powerSourceResponse, replacements) // Converting Power Source Repose to understandable text
+	genStateResponse := radarResponse.RDA.Properties.GeneratorState
+	genStateStatement, err := replacePhrases(genStateResponse, replacements) // Converting Power Source Repose to understandable text
 	if err != nil {
 		return nil, err
 	}
@@ -100,13 +100,14 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 		VCP:         radarVCPCode,
 		Mode:        radarMode,
 		Status:      radarResponse.RDA.Properties.Mode,
-		PowerSource: powerSourceStatement,
-		GenState:    radarResponse.RDA.Properties.GeneratorState,
+		PowerSource: radarResponse.Performance.Properties.PowerSource,
+		GenState:    genStateStatement,
 	}
 
 	return radarData, nil
 }
 
+// Data Transformation
 // radarMode converts a VCP code into a human-readable radar mode description.
 func radarMode(vcp string) (string, error) {
 	var radarMode string
@@ -125,6 +126,7 @@ func radarMode(vcp string) (string, error) {
 	return radarMode, nil
 }
 
+// Data Transformation
 // replacePhrases replaces phrases in the input string based on the replacements map.
 func replacePhrases(input string, replacements map[string]string) (string, error) {
 	for pattern, replacement := range replacements {
@@ -191,7 +193,8 @@ func sendPushoverNotification(title, message string) error {
 }
 
 // fetchAndReportRadarData fetches radar data for a list of station IDs and reports any changes in the data.
-// The fetched data is compared with the last stored data for each station ID, and if there are changes a push notification is sent using the sendPushoverNotification function.
+// The fetched data is compared with the last stored data for each station ID, and if there are changes a
+// push notification is sent using the sendPushoverNotification function.
 // The radar data and its mode are stored in the radarDataMap in memory.
 // Goroutines are used to perform the api call and data processing per station ID
 func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}) {
