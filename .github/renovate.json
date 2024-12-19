@@ -11,5 +11,8 @@
     "suppressNotifications": [
       "prEditedNotification",
       "prIgnoreNotification"
+    ],
+    "postUpdateOptions": [
+      "gomodTidy"
     ]
-  }
+}
