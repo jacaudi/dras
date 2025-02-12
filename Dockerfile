@@ -1,5 +1,5 @@
 # Build Stage
-FROM golang:1.23.6-alpine AS build
+FROM golang:1.24.0-alpine AS build
 
 ARG TARGETOS
 ARG TARGETARCH
