@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacaudi/nwsgo"
+	"github.com/jacaudi/nws/cmd/nws"
 	"github.com/nikoksr/notify"
 	"github.com/nikoksr/notify/service/pushover"
 )
@@ -71,7 +71,7 @@ func sanitizeStationIDs(stationInput string) []string {
 // getRadarResponse retrieves radar data for a given station ID.
 // It returns a pointer to a RadarData struct and an error if any.
 func getRadarResponse(stationID string) (*RadarData, error) {
-	radarResponse, err := nwsgo.RadarStation(stationID)
+	radarResponse, err := nws.RadarStation(stationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get RADAR data for station %q: %w", stationID, err)
 	}
@@ -293,7 +293,7 @@ func main() {
 		stationIDs = sanitizeStationIDs(stationInput)
 	}
 	log.Println("Set UserAgent to https://github.com/jacaudi/dras")
-	config := nwsgo.Config{}
+	config := nws.Config{}
 	config.SetUserAgent("dras/1.0 (+https://github.com/jacaudi/dras)")
 	fetchAndReportRadarData(stationIDs, radarDataMap)
 
