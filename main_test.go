@@ -42,17 +42,19 @@ func TestRadarMode(t *testing.T) {
 
 func TestCompareRadarData(t *testing.T) {
 	oldData := &RadarData{
-		VCP:         "R35",
-		Status:      "Operational",
-		PowerSource: "Commercial",
-		GenState:    "Running",
+		VCP:               "R35",
+		Status:            "Operational",
+		PowerSource:       "Commercial",
+		GenState:          "Running",
+		OperabilityStatus: "RDA - Inoperable",
 	}
 
 	newData := &RadarData{
-		VCP:         "R215",
-		Status:      "Operational",
-		PowerSource: "Backup",
-		GenState:    "Stopped",
+		VCP:               "R215",
+		Status:            "Operational",
+		PowerSource:       "Backup",
+		GenState:          "Stopped",
+		OperabilityStatus: "Functioning",
 	}
 
 	changed, message := compareRadarData(oldData, newData)
@@ -60,6 +62,7 @@ func TestCompareRadarData(t *testing.T) {
 	assert.Contains(t, message, "The Radar is in Precipitation Mode -- Precipitation Detected")
 	assert.Contains(t, message, "Power source changed from Commercial to Backup")
 	assert.Contains(t, message, "Generator state changed from Running to Stopped")
+	assert.Contains(t, message, "Radar operability changed from RDA - Inoperable to Functioning")
 }
 
 func TestGenStateSimp(t *testing.T) {
