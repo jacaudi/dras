@@ -2,8 +2,8 @@
 FROM golang:1.24.0-alpine
 
 # Install necessary tools
-RUN apk add --update --no-cache bash curl jq
-RUN apk add --update git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
+RUN apk add --update --no-cache bash curl jq openssh
+RUN apk add --update --no-cache git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
 
 # Create a non-root user
 RUN adduser -D -h /home/vscode -s /bin/bash vscode \
