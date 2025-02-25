@@ -34,7 +34,6 @@ type RadarData struct {
 	OperabilityStatus string // Operability Status of the radar.
 	PowerSource       string // Power source of the radar.
 	GenState          string // General state of the radar.
-	Level2LastUpdate  string // The timestamp of the most recent level 2 data transmission
 }
 
 // checkEnvVars checks if the required environment variables are set.
@@ -101,7 +100,6 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 		OperabilityStatus: radarResponse.RDA.Properties.OperabilityStatus,
 		PowerSource:       radarResponse.Performance.Properties.PowerSource,
 		GenState:          genStateStatement,
-		Level2LastUpdate:  radarResponse.Latency.LevelTwoLastReceivedTime,
 	}
 
 	return radarData, nil
