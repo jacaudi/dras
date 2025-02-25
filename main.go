@@ -112,8 +112,14 @@ func radarMode(vcp string) (string, error) {
 	var radarMode string
 
 	switch vcp {
+	case "R31":
+		radarMode = "Clear Air"
 	case "R35":
 		radarMode = "Clear Air"
+	case "R12":
+		radarMode = "Precipitation"
+	case "R112":
+		radarMode = "Precipitation"
 	case "R212":
 		radarMode = "Precipitation"
 	case "R215":
@@ -150,10 +156,14 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	var changes []string
 
 	if oldData.VCP != newData.VCP {
-		if newData.VCP == "R35" {
+		if newData.VCP == "R35" || newData.VCP == "R31" {
 			changes = append(changes, "The Radar is in Clear Air Mode -- No Precipitation Detected")
-		} else if newData.VCP == "R215" {
+		} else if newData.VCP == "R12" || newData.VCP == "R212" {
 			changes = append(changes, "The Radar is in Precipitation Mode -- Precipitation Detected")
+		} else if newData.VCP == "R215" {
+			changes = append(changes, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
+		} else if newData.VCP == "R112" {
+			changes = append(changes, "The Radar is in Precipitation Mode (Velocity  Scanning Emphasis) -- Precipitation Detected")
 		} else {
 			changes = append(changes, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP))
 		}
