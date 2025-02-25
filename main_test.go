@@ -59,7 +59,7 @@ func TestCompareRadarData(t *testing.T) {
 
 	changed, message := compareRadarData(oldData, newData)
 	assert.True(t, changed)
-	assert.Contains(t, message, "The Radar is in Precipitation Mode -- Precipitation Detected")
+	assert.Contains(t, message, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
 	assert.Contains(t, message, "Power source changed from Commercial to Backup")
 	assert.Contains(t, message, "Generator state changed from Running to Stopped")
 	assert.Contains(t, message, "Radar operability changed from RDA - Inoperable to Functioning")
