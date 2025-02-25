@@ -27,12 +27,14 @@ var (
 
 // RadarData represents the data for a radar.
 type RadarData struct {
-	Name        string // Name of the radar.
-	VCP         string // Volume Coverage Pattern of the radar.
-	Mode        string // Scanning mode of the radar.
-	Status      string // Status of the radar.
-	PowerSource string // Power source of the radar.
-	GenState    string // General state of the radar.
+	Name              string // Name of the radar.
+	VCP               string // Volume Coverage Pattern of the radar.
+	Mode              string // Scanning mode of the radar.
+	Status            string // Status of the radar.
+	OperabilityStatus string // Operability Status of the radar.
+	PowerSource       string // Power source of the radar.
+	GenState          string // General state of the radar.
+	Level2LastUpdate  string // The timestamp of the most recent level 2 data transmission
 }
 
 // checkEnvVars checks if the required environment variables are set.
@@ -92,12 +94,14 @@ func getRadarResponse(stationID string) (*RadarData, error) {
 
 	// Constructing the RadarData structure with both VCP and human-readable translation
 	radarData := &RadarData{
-		Name:        radarResponse.Name,
-		VCP:         radarVCPCode,
-		Mode:        radarMode,
-		Status:      radarResponse.RDA.Properties.Mode,
-		PowerSource: radarResponse.Performance.Properties.PowerSource,
-		GenState:    genStateStatement,
+		Name:              radarResponse.Name,
+		VCP:               radarVCPCode,
+		Mode:              radarMode,
+		Status:            radarResponse.RDA.Properties.Status,
+		OperabilityStatus: radarResponse.RDA.Properties.OperabilityStatus,
+		PowerSource:       radarResponse.Performance.Properties.PowerSource,
+		GenState:          genStateStatement,
+		Level2LastUpdate:  radarResponse.Latency.LevelTwoLastReceivedTime,
 	}
 
 	return radarData, nil
@@ -159,6 +163,10 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 
 	if oldData.Status != newData.Status {
 		changes = append(changes, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status))
+	}
+
+	if oldData.OperabilityStatus != newData.OperabilityStatus {
+		changes = append(changes, fmt.Sprintf("Radar operability changed from %s to %s", oldData.OperabilityStatus, newData.OperabilityStatus))
 	}
 
 	if oldData.PowerSource != newData.PowerSource {
