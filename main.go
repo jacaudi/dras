@@ -23,6 +23,12 @@ var (
 	userKey           = os.Getenv("PUSHOVER_USER_KEY")
 	dryrun, _         = strconv.ParseBool(os.Getenv("DRYRUN"))
 	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
+
+	alertOnVCP, _         = strconv.ParseBool(getEnvDefault("ALERT_VCP", "true"))
+	alertOnStatus, _      = strconv.ParseBool(getEnvDefault("ALERT_STATUS", "false"))
+	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_OPERABILITY", "false"))
+	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_POWER_SOURCE", "false"))
+	alertOnGenState, _    = strconv.ParseBool(getEnvDefault("ALERT_GEN_STATE", "false"))
 )
 
 // RadarData represents the data for a radar.
@@ -34,6 +40,15 @@ type RadarData struct {
 	OperabilityStatus string // Operability Status of the radar.
 	PowerSource       string // Power source of the radar.
 	GenState          string // General state of the radar.
+}
+
+// getEnvDefault returns the value of the environment variable if set, otherwise returns the default value.
+func getEnvDefault(key, defaultVal string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultVal
+	}
+	return val
 }
 
 // checkEnvVars checks if the required environment variables are set.
@@ -155,7 +170,7 @@ func genStateSimp(input string) (string, error) {
 func compareRadarData(oldData, newData *RadarData) (bool, string) {
 	var changes []string
 
-	if oldData.VCP != newData.VCP {
+	if alertOnVCP && oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" || newData.VCP == "R31" {
 			changes = append(changes, "The Radar is in Clear Air Mode -- No Precipitation Detected")
 		} else if newData.VCP == "R12" || newData.VCP == "R212" {
@@ -169,19 +184,19 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 		}
 	}
 
-	if oldData.Status != newData.Status {
+	if alertOnStatus && oldData.Status != newData.Status {
 		changes = append(changes, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status))
 	}
 
-	if oldData.OperabilityStatus != newData.OperabilityStatus {
+	if alertOnOperability && oldData.OperabilityStatus != newData.OperabilityStatus {
 		changes = append(changes, fmt.Sprintf("Radar operability changed from %s to %s", oldData.OperabilityStatus, newData.OperabilityStatus))
 	}
 
-	if oldData.PowerSource != newData.PowerSource {
+	if alertOnPowerSource && oldData.PowerSource != newData.PowerSource {
 		changes = append(changes, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource))
 	}
 
-	if oldData.GenState != newData.GenState {
+	if alertOnGenState && oldData.GenState != newData.GenState {
 		changes = append(changes, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState))
 	}
 
