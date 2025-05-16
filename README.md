@@ -28,6 +28,11 @@
     - `STATION_IDS` — WSR-88D (Radar) Sites (e.g. KRAX - Raleigh/Durham)
     - `PUSHOVER_USER_KEY` — Your Pushover User Key
     - `PUSHOVER_API_TOKEN` — Your Pushover API Token
+    - `ALERT_VCP` — Enable Alerts on changes to Volume Coverage Pattern (default: `true`)
+    - `ALERT_STATUS` — Enable Alerts on changes to radar operational status (default: `false`)
+    - `ALERT_OPERABILITY` — Enable Alerts on changes to radar operability status (default: `false`)
+    - `ALERT_POWER_SOURCE` — Enable Alerts on changes to radar power source (default: `false`)
+    - `ALERT_GEN_STATE` — Enable Alerts on changes to generator state (default: `false`)
  4. Enjoy!
 
 ### Standalone Container Method
@@ -39,6 +44,9 @@ docker run -d \
   -e STATION_IDS=KRAX \
   -e PUSHOVER_USER_KEY=<KEY> \
   -e PUSHOVER_API_TOKEN=<TOKEN> \
+  -e ALERT_VCP=false \
+  -e ALERT_STATUS=true \
+  -e ALERT_OPERABILITY=true \
   ghcr.io/jacaudi/dras:v1.0.0
 ```
 
