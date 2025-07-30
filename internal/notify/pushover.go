@@ -8,7 +8,7 @@ import (
 	"github.com/nikoksr/notify/service/pushover"
 )
 
-// Service handles notification operations.
+// Service handles notification operations and implements the Notifier interface.
 type Service struct {
 	apiToken string
 	userKey  string

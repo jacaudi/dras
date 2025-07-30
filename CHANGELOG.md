@@ -14,7 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `internal/radar/` - Radar data operations and comparison logic  
   - `internal/notify/` - Notification services (Pushover)
   - `internal/monitor/` - Core monitoring and orchestration logic
-- Extensive test coverage with 22+ unit and integration tests
+- Extensive test coverage with 35+ unit and integration tests
+- Performance benchmarking suite for concurrent operations
+- Mock interfaces for external dependencies (NWS API, Pushover)
+- Race condition detection tests and concurrency safety validation
+- Integration tests for real API calls (with build tags)
 - Proper dependency injection pattern throughout the application
 - Enhanced error handling with context propagation
 - Integration tests for main package functionality
