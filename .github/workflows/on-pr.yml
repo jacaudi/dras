@@ -17,18 +17,3 @@ jobs:
 
       - name: Tests
         uses: ./.github/actions/tests
-
-  build-image:
-    runs-on: ubuntu-latest
-    needs: tests
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build PR Image
-        uses: ./.github/actions/docker
-        with:
-          token: "${{ secrets.GITHUB_TOKEN }}"
-          latest: false
-          push: false
-          tag-strategy: "sha"
