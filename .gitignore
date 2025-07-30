@@ -21,5 +21,13 @@
 go.work
 go.work.sum
 
+# Go Binary
+bin/
+build/
+dras
+
 # env file
 .env
+
+# Claude AI files
+.claude/**

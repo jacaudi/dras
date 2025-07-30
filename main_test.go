@@ -1,145 +1,193 @@
 package main
 
 import (
-	"strconv"
+	"os"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/jacaudi/dras/internal/config"
+	"github.com/jacaudi/dras/internal/monitor"
+	"github.com/jacaudi/dras/internal/notify"
+	"github.com/jacaudi/dras/internal/radar"
 )
 
-func TestSanitizeStationIDs(t *testing.T) {
-	// Set up environment variables
-	t.Setenv("STATION_IDS", "KATX,KRAX,KTLX")
-	t.Setenv("PUSHOVER_API_TOKEN", "your_api_token")
-	t.Setenv("PUSHOVER_USER_KEY", "your_user_key")
+func TestMainIntegration(t *testing.T) {
+	// Since main() calls log.Fatalf on errors and runs indefinitely,
+	// we can't directly test the main function. Instead, we'll test
+	// the integration components that main() uses.
 
-	input := "KATX, KRAX; KTLX"
-	expected := []string{"KATX", "KRAX", "KTLX"}
-	result := sanitizeStationIDs(input)
-	assert.Equal(t, expected, result)
-}
-
-func TestRadarMode(t *testing.T) {
-	tests := []struct {
-		vcp      string
-		expected string
-		err      bool
-	}{
-		{"R35", "Clear Air", false},
-		{"R215", "Precipitation", false},
-		{"R999", "", true},
-	}
-
-	for _, test := range tests {
-		result, err := radarMode(test.vcp)
-		if test.err {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, test.expected, result)
+	t.Run("config loading and validation", func(t *testing.T) {
+		// Save original environment
+		origEnv := map[string]string{
+			"STATION_IDS":        os.Getenv("STATION_IDS"),
+			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
+			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
+			"DRYRUN":             os.Getenv("DRYRUN"),
 		}
-	}
-}
 
-func TestCompareRadarData(t *testing.T) {
-	// Set up environment variables for feature alerts
-	t.Setenv("ALERT_ON_VCP", "true")
-	t.Setenv("ALERT_ON_STATUS", "true")
-	t.Setenv("ALERT_ON_OPERABILITY", "true")
-	t.Setenv("ALERT_ON_POWER_SOURCE", "true")
-	t.Setenv("ALERT_ON_GEN_STATE", "true")
+		// Clean environment
+		defer func() {
+			for key, value := range origEnv {
+				if value == "" {
+					os.Unsetenv(key)
+				} else {
+					os.Setenv(key, value)
+				}
+			}
+		}()
 
-	// Re-evaluate alert variables to pick up new env values
-	alertOnVCP, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_VCP", "true"))
-	alertOnStatus, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_STATUS", "false"))
-	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_OPERABILITY", "false"))
-	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_POWER_SOURCE", "false"))
-	alertOnGenState, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_GEN_STATE", "false"))
+		// Set up test environment for dry run
+		os.Setenv("DRYRUN", "true")
+		os.Setenv("INTERVAL", "1") // 1 minute for testing
 
-	oldData := &RadarData{
-		VCP:               "R35",
-		Status:            "Operational",
-		PowerSource:       "Commercial",
-		GenState:          "Running",
-		OperabilityStatus: "RDA - Inoperable",
-	}
-
-	newData := &RadarData{
-		VCP:               "R215",
-		Status:            "Operational",
-		PowerSource:       "Backup",
-		GenState:          "Stopped",
-		OperabilityStatus: "Functioning",
-	}
-
-	changed, message := compareRadarData(oldData, newData)
-	assert.True(t, changed)
-	assert.Contains(t, message, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
-	assert.Contains(t, message, "Power source changed from Commercial to Backup")
-	assert.Contains(t, message, "Generator state changed from Running to Stopped")
-	assert.Contains(t, message, "Radar operability changed from RDA - Inoperable to Functioning")
-}
-
-func TestCompareRadarData_Defaults(t *testing.T) {
-	// Unset all feature alert env vars to test defaults (only VCP should be true)
-	t.Setenv("ALERT_ON_VCP", "")
-	t.Setenv("ALERT_ON_STATUS", "")
-	t.Setenv("ALERT_ON_OPERABILITY", "")
-	t.Setenv("ALERT_ON_POWER_SOURCE", "")
-	t.Setenv("ALERT_ON_GEN_STATE", "")
-
-	// Re-evaluate alert variables to pick up default values
-	alertOnVCP, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_VCP", "true"))
-	alertOnStatus, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_STATUS", "false"))
-	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_OPERABILITY", "false"))
-	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_POWER_SOURCE", "false"))
-	alertOnGenState, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_GEN_STATE", "false"))
-
-	oldData := &RadarData{
-		VCP:               "R35",
-		Status:            "Operational",
-		PowerSource:       "Commercial",
-		GenState:          "Running",
-		OperabilityStatus: "RDA - Inoperable",
-	}
-
-	newData := &RadarData{
-		VCP:               "R215",
-		Status:            "Offline",
-		PowerSource:       "Backup",
-		GenState:          "Stopped",
-		OperabilityStatus: "Functioning",
-	}
-
-	changed, message := compareRadarData(oldData, newData)
-	assert.True(t, changed)
-	assert.Contains(t, message, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
-	assert.NotContains(t, message, "Power source changed")
-	assert.NotContains(t, message, "Generator state changed")
-	assert.NotContains(t, message, "Radar operability changed")
-	assert.NotContains(t, message, "Radar status changed")
-}
-
-func TestGenStateSimp(t *testing.T) {
-	tests := []struct {
-		genInput  string
-		expected  string
-		expectErr bool
-	}{
-		{"Switched to Auxiliary Power|Utility PWR Available|Generator On", "On", false},
-		{"Switched to Auxiliary Power|Generator On", "On", false},
-		{"Utility PWR Available|Generator On", "On", false},
-		{"Utility PWR Available", "Off", false},
-		{"Unknown Input", "", true},
-	}
-
-	for _, test := range tests {
-		result, err := genStateSimp(test.genInput)
-		if test.expectErr {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, test.expected, result)
+		// Test that config loads successfully
+		cfg, err := config.Load()
+		if err != nil {
+			t.Fatalf("Config load failed: %v", err)
 		}
-	}
+
+		// Test that validation passes for dry run
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("Config validation failed: %v", err)
+		}
+
+		// Verify dry run settings
+		if !cfg.DryRun {
+			t.Error("Expected DryRun to be true")
+		}
+
+		if cfg.CheckInterval != 1*time.Minute {
+			t.Errorf("Expected CheckInterval to be 1m, got %v", cfg.CheckInterval)
+		}
+	})
+
+	t.Run("service initialization", func(t *testing.T) {
+		// Save original environment
+		origEnv := map[string]string{
+			"DRYRUN":             os.Getenv("DRYRUN"),
+			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
+			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
+		}
+
+		// Clean environment
+		defer func() {
+			for key, value := range origEnv {
+				if value == "" {
+					os.Unsetenv(key)
+				} else {
+					os.Setenv(key, value)
+				}
+			}
+		}()
+
+		t.Run("dry run mode - no notification service", func(t *testing.T) {
+			os.Setenv("DRYRUN", "true")
+
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatalf("Config load failed: %v", err)
+			}
+
+			// Initialize services like main() does
+			radarService := radar.New()
+			if radarService == nil {
+				t.Error("Expected radar service to be initialized")
+			}
+
+			var notifyService *notify.Service
+			if !cfg.DryRun {
+				notifyService = notify.New(cfg.PushoverAPIToken, cfg.PushoverUserKey)
+			}
+
+			// In dry run mode, notify service should be nil
+			if notifyService != nil {
+				t.Error("Expected notify service to be nil in dry run mode")
+			}
+
+			// Initialize monitor
+			monitorService := monitor.New(radarService, notifyService, cfg)
+			if monitorService == nil {
+				t.Error("Expected monitor service to be initialized")
+			}
+		})
+
+		t.Run("production mode - with notification service", func(t *testing.T) {
+			os.Setenv("DRYRUN", "false")
+			os.Setenv("PUSHOVER_API_TOKEN", "abcdefghijklmnopqrstuvwxyz1234") // 30 alphanumeric chars
+			os.Setenv("PUSHOVER_USER_KEY", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234")  // 30 alphanumeric chars
+			os.Setenv("STATION_IDS", "KATX")
+			os.Setenv("INTERVAL", "1") // 1 minute for testing
+
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatalf("Config load failed: %v", err)
+			}
+
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Config validation failed: %v", err)
+			}
+
+			// Initialize services like main() does
+			radarService := radar.New()
+			if radarService == nil {
+				t.Error("Expected radar service to be initialized")
+			}
+
+			var notifyService *notify.Service
+			if !cfg.DryRun {
+				notifyService = notify.New(cfg.PushoverAPIToken, cfg.PushoverUserKey)
+			}
+
+			// In production mode, notify service should be initialized
+			if notifyService == nil {
+				t.Error("Expected notify service to be initialized in production mode")
+			}
+
+			// Initialize monitor
+			monitorService := monitor.New(radarService, notifyService, cfg)
+			if monitorService == nil {
+				t.Error("Expected monitor service to be initialized")
+			}
+		})
+	})
+
+	t.Run("error conditions", func(t *testing.T) {
+		// Save original environment
+		origEnv := map[string]string{
+			"DRYRUN":             os.Getenv("DRYRUN"),
+			"STATION_IDS":        os.Getenv("STATION_IDS"),
+			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
+			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
+		}
+
+		// Clean environment
+		defer func() {
+			for key, value := range origEnv {
+				if value == "" {
+					os.Unsetenv(key)
+				} else {
+					os.Setenv(key, value)
+				}
+			}
+		}()
+
+		t.Run("missing required config in production mode", func(t *testing.T) {
+			// Clear all environment variables
+			for key := range origEnv {
+				os.Unsetenv(key)
+			}
+			os.Setenv("DRYRUN", "false")
+			os.Setenv("INTERVAL", "1") // 1 minute for testing
+
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatalf("Config load failed: %v", err)
+			}
+
+			// Validation should fail
+			if err := cfg.Validate(); err == nil {
+				t.Error("Expected validation to fail when missing required config")
+			}
+		})
+	})
 }
