@@ -113,9 +113,10 @@ func TestMainIntegration(t *testing.T) {
 
 		t.Run("production mode - with notification service", func(t *testing.T) {
 			os.Setenv("DRYRUN", "false")
-			os.Setenv("PUSHOVER_API_TOKEN", "test-token")
-			os.Setenv("PUSHOVER_USER_KEY", "test-key")
+			os.Setenv("PUSHOVER_API_TOKEN", "abcdefghijklmnopqrstuvwxyz1234") // 30 alphanumeric chars
+			os.Setenv("PUSHOVER_USER_KEY", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234")  // 30 alphanumeric chars
 			os.Setenv("STATION_IDS", "KATX")
+			os.Setenv("INTERVAL", "1") // 1 minute for testing
 
 			cfg, err := config.Load()
 			if err != nil {
@@ -176,6 +177,7 @@ func TestMainIntegration(t *testing.T) {
 				os.Unsetenv(key)
 			}
 			os.Setenv("DRYRUN", "false")
+			os.Setenv("INTERVAL", "1") // 1 minute for testing
 
 			cfg, err := config.Load()
 			if err != nil {

@@ -112,13 +112,52 @@ func simplifyGeneratorState(input string) (string, error) {
 }
 
 // SanitizeStationIDs splits a string of station IDs by space, comma, or semicolon
-// and returns a slice of sanitized station IDs.
+// and returns a slice of sanitized and validated station IDs.
 func SanitizeStationIDs(stationInput string) []string {
 	// Define a regular expression to split by space, comma, or semicolon
 	re := regexp.MustCompile(`[ ,;]+`)
 	stationIDs := re.Split(stationInput, -1)
-	for i := range stationIDs {
-		stationIDs[i] = strings.TrimSpace(stationIDs[i])
+	
+	var validStations []string
+	for _, stationID := range stationIDs {
+		trimmed := strings.TrimSpace(stationID)
+		if trimmed == "" {
+			continue
+		}
+		// Convert to uppercase and validate format
+		trimmed = strings.ToUpper(trimmed)
+		if ValidateStationID(trimmed) {
+			validStations = append(validStations, trimmed)
+		}
 	}
-	return stationIDs
+	return validStations
+}
+
+// ValidateStationID validates a radar station ID format
+// Station IDs should be 4 characters, starting with 'K' for US stations
+func ValidateStationID(stationID string) bool {
+	if len(stationID) != 4 {
+		return false
+	}
+	
+	// US radar stations typically start with 'K'
+	// Some exceptions exist but this covers 99% of cases
+	if !strings.HasPrefix(stationID, "K") {
+		// Allow some international stations or special cases
+		// But validate they are all uppercase letters
+		for _, char := range stationID {
+			if char < 'A' || char > 'Z' {
+				return false
+			}
+		}
+	}
+	
+	// Validate all characters are uppercase letters
+	for _, char := range stationID {
+		if char < 'A' || char > 'Z' {
+			return false
+		}
+	}
+	
+	return true
 }

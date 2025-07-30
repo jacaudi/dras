@@ -106,7 +106,10 @@ func TestLoad(t *testing.T) {
 
 func TestConfig_Validate(t *testing.T) {
 	t.Run("validates dry run mode", func(t *testing.T) {
-		cfg := &Config{DryRun: true}
+		cfg := &Config{
+			DryRun:        true,
+			CheckInterval: 5 * time.Minute, // Ensure minimum interval is met
+		}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("Validation should pass for dry run mode: %v", err)
 		}
@@ -116,8 +119,9 @@ func TestConfig_Validate(t *testing.T) {
 		cfg := &Config{
 			DryRun:           false,
 			StationInput:     "KATX",
-			PushoverAPIToken: "token",
-			PushoverUserKey:  "key",
+			PushoverAPIToken: "abcdefghijklmnopqrstuvwxyz1234", // 30 alphanumeric chars
+			PushoverUserKey:  "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", // 30 alphanumeric chars  
+			CheckInterval:    5 * time.Minute,                   // Ensure minimum interval is met
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("Validation should pass with all required fields: %v", err)
@@ -125,7 +129,10 @@ func TestConfig_Validate(t *testing.T) {
 	})
 
 	t.Run("fails validation when missing required fields", func(t *testing.T) {
-		cfg := &Config{DryRun: false}
+		cfg := &Config{
+			DryRun:        false,
+			CheckInterval: 5 * time.Minute, // Ensure minimum interval is met
+		}
 		if err := cfg.Validate(); err == nil {
 			t.Error("Validation should fail when missing required fields")
 		}

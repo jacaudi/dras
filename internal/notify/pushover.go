@@ -2,8 +2,11 @@ package notify
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
+	"regexp"
 
+	"github.com/jacaudi/dras/internal/logger"
 	"github.com/nikoksr/notify"
 	"github.com/nikoksr/notify/service/pushover"
 )
@@ -20,6 +23,67 @@ func New(apiToken, userKey string) *Service {
 		apiToken: apiToken,
 		userKey:  userKey,
 	}
+}
+
+// ValidateCredentials validates Pushover API credentials format
+func (s *Service) ValidateCredentials() error {
+	if err := ValidateAPIToken(s.apiToken); err != nil {
+		return fmt.Errorf("invalid API token: %w", err)
+	}
+	
+	if err := ValidateUserKey(s.userKey); err != nil {
+		return fmt.Errorf("invalid user key: %w", err)
+	}
+	
+	return nil
+}
+
+// ValidateAPIToken validates the format of a Pushover API token
+func ValidateAPIToken(token string) error {
+	if token == "" {
+		return errors.New("API token cannot be empty")
+	}
+	
+	// Pushover API tokens are 30 characters long, alphanumeric
+	if len(token) != 30 {
+		return errors.New("API token must be exactly 30 characters long")
+	}
+	
+	// Check for alphanumeric characters only
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+$`, token)
+	if err != nil {
+		return fmt.Errorf("error validating API token format: %w", err)
+	}
+	
+	if !matched {
+		return errors.New("API token must contain only alphanumeric characters")
+	}
+	
+	return nil
+}
+
+// ValidateUserKey validates the format of a Pushover user key
+func ValidateUserKey(userKey string) error {
+	if userKey == "" {
+		return errors.New("user key cannot be empty")
+	}
+	
+	// Pushover user keys are 30 characters long, alphanumeric
+	if len(userKey) != 30 {
+		return errors.New("user key must be exactly 30 characters long")
+	}
+	
+	// Check for alphanumeric characters only
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+$`, userKey)
+	if err != nil {
+		return fmt.Errorf("error validating user key format: %w", err)
+	}
+	
+	if !matched {
+		return errors.New("user key must contain only alphanumeric characters")
+	}
+	
+	return nil
 }
 
 // SendNotification sends a Pushover notification with the specified title and message.
@@ -42,6 +106,6 @@ func (s *Service) SendNotification(ctx context.Context, title, message string) e
 		return err
 	}
 
-	log.Println("Pushover notification sent successfully!")
+	logger.Debug("Pushover notification sent successfully")
 	return nil
 }

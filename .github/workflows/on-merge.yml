@@ -23,8 +23,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build
+      - name: Build Latest Image
         uses: ./.github/actions/docker
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
           latest: true
+          push: true
+          tag-strategy: "latest"

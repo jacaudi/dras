@@ -3,11 +3,11 @@ package monitor
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
 	"github.com/jacaudi/dras/internal/config"
+	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
 )
@@ -35,26 +35,31 @@ func New(radarService *radar.Service, notifyService *notify.Service, cfg *config
 func (m *Monitor) Start(ctx context.Context) error {
 	var stationIDs []string
 
-	log.Println("DRAS -- Start Monitoring Service")
+	logger.Info("Starting monitoring service")
 	if m.config.DryRun {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
+		logger.Info("Running in dry-run mode with test stations: %v", stationIDs)
 	} else {
 		stationIDs = radar.SanitizeStationIDs(m.config.StationInput)
+		logger.Info("Monitoring %d stations: %v", len(stationIDs), stationIDs)
 	}
 
 	// Initial fetch
+	logger.Info("Performing initial radar data fetch")
 	m.fetchAndReportRadarData(ctx, stationIDs)
 
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(m.config.CheckInterval)
 	defer ticker.Stop()
 
+	logger.Info("Monitoring started, checking every %v", m.config.CheckInterval)
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Monitoring stopped: %v", ctx.Err())
 			return ctx.Err()
 		case <-ticker.C:
-			log.Println("DRAS -- Updating Radar Data")
+			logger.Debug("Performing periodic radar data update")
 			m.fetchAndReportRadarData(ctx, stationIDs)
 		}
 	}
@@ -73,7 +78,7 @@ func (m *Monitor) fetchAndReportRadarData(ctx context.Context, stationIDs []stri
 		go func(stationID string) {
 			defer wg.Done()
 			if err := m.processStation(ctx, stationID); err != nil {
-				log.Printf("Error processing station %s: %v\n", stationID, err)
+				logger.WithField("station", stationID).Error("Failed to process station: %v", err)
 			}
 		}(stationID)
 	}
@@ -83,7 +88,8 @@ func (m *Monitor) fetchAndReportRadarData(ctx context.Context, stationIDs []stri
 
 // processStation handles the processing of a single radar station.
 func (m *Monitor) processStation(ctx context.Context, stationID string) error {
-	log.Printf("Fetching radar data for station: %s\n", stationID)
+	stationLogger := logger.WithField("station", stationID)
+	stationLogger.Debug("Fetching radar data")
 	newRadarData, err := m.radarService.FetchData(stationID)
 	if err != nil {
 		return fmt.Errorf("error fetching radar data for station %s: %w", stationID, err)
@@ -109,13 +115,14 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	// Handle first run outside of mutex
 	if isFirstRun {
 		initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
-		log.Printf("Initial radar data stored for station %s.", stationID)
+		stationLogger.Info("Initial radar data stored - %s", initialMessage)
 		if m.config.DryRun {
-			log.Printf("Debug Pushover -- Title: DRAS Startup - Msg: %s\n", initialMessage)
+			stationLogger.Debug("Would send startup notification: %s", initialMessage)
 		} else {
 			if err := m.notifyService.SendNotification(ctx, "DRAS Startup", initialMessage); err != nil {
-				return fmt.Errorf("error sending Pushover alert for station %s: %w", stationID, err)
+				return fmt.Errorf("failed to send startup notification for station %s: %w", stationID, err)
 			}
+			stationLogger.Info("Startup notification sent successfully")
 		}
 		return nil
 	}
@@ -137,19 +144,25 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 
 	changed, changeMessage := radar.CompareData(lastData, newRadarData, alertConfig)
 	if changed {
-		log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
+		logger.WithFields(map[string]string{
+			"station": stationID,
+			"station_name": newRadarData.Name,
+			"change":       changeMessage,
+		}).Info("Radar data changed")
+		
 		if m.config.DryRun {
-			log.Printf("Debug Pushover -- Title: %s - Msg: %s\n", stationID, changeMessage)
+			stationLogger.Debug("Would send change notification: %s", changeMessage)
 		} else {
 			if err := m.notifyService.SendNotification(ctx, fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
-				return fmt.Errorf("error sending Pushover alert for station %s: %w", stationID, err)
+				return fmt.Errorf("failed to send change notification for station %s: %w", stationID, err)
 			}
+			stationLogger.Info("Change notification sent successfully")
 		}
 		m.mu.Lock()
 		m.radarDataMap[stationID]["last"] = newRadarData
 		m.mu.Unlock()
 	} else {
-		log.Printf("No changes in radar data for station %s\n", stationID)
+		stationLogger.Debug("No changes detected in radar data")
 	}
 
 	return nil

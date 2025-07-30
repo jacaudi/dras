@@ -52,7 +52,11 @@ func TestSanitizeStationIDs(t *testing.T) {
 		{"KATX;KRAX", []string{"KATX", "KRAX"}},
 		{"KATX, KRAX ; KBGM", []string{"KATX", "KRAX", "KBGM"}},
 		{"KATX", []string{"KATX"}},
-		{"", []string{""}},
+		{"", []string{}},
+		{"katx krax", []string{"KATX", "KRAX"}}, // test lowercase conversion
+		{"KATX, invalid, KRAX", []string{"KATX", "KRAX"}}, // test filtering invalid
+		{"K1TX", []string{}}, // test invalid - contains number
+		{"ATXX", []string{"ATXX"}}, // test valid non-K station
 	}
 
 	for _, tt := range tests {
@@ -68,6 +72,35 @@ func TestSanitizeStationIDs(t *testing.T) {
 				if result[i] != expected {
 					t.Errorf("Expected station[%d] = %q, got %q", i, expected, result[i])
 				}
+			}
+		})
+	}
+}
+
+func TestValidateStationID(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+		name     string
+	}{
+		{"KATX", true, "valid US station"},
+		{"KRAX", true, "valid US station"},
+		{"ATXX", true, "valid non-K station"},
+		{"PGUA", true, "valid international station"},
+		{"katx", false, "lowercase should fail"},
+		{"K1TX", false, "contains number"},
+		{"KAT", false, "too short"},
+		{"KATXX", false, "too long"},
+		{"", false, "empty string"},
+		{"123A", false, "starts with number"},
+		{"K@TX", false, "contains special character"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateStationID(tt.input)
+			if result != tt.expected {
+				t.Errorf("ValidateStationID(%q) = %v, expected %v", tt.input, result, tt.expected)
 			}
 		})
 	}

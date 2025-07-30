@@ -16,6 +16,11 @@ inputs:
     type: boolean
     required: false
     default: true
+  tag-strategy:
+    description: Tag strategy (sha, latest, semver)
+    type: string
+    required: false
+    default: "auto"
 
 runs:
   using: composite
@@ -28,10 +33,12 @@ runs:
         flavor: |
           latest=${{ fromJSON(inputs.latest) }}
         tags: |
-          type=ref,event=branch
-          type=semver,pattern={{version}},prefix=v
-          type=semver,pattern={{major}}.{{minor}},prefix=v
-          type=semver,pattern={{major}},prefix=v
+          type=ref,event=branch,enable=${{ inputs.tag-strategy == 'auto' || inputs.tag-strategy == 'branch' }}
+          type=sha,prefix={{branch}}-,enable=${{ inputs.tag-strategy == 'sha' }}
+          type=semver,pattern={{version}},prefix=v,enable=${{ inputs.tag-strategy == 'semver' || inputs.tag-strategy == 'auto' }}
+          type=semver,pattern={{major}}.{{minor}},prefix=v,enable=${{ inputs.tag-strategy == 'semver' || inputs.tag-strategy == 'auto' }}
+          type=semver,pattern={{major}},prefix=v,enable=${{ inputs.tag-strategy == 'semver' || inputs.tag-strategy == 'auto' }}
+          type=raw,value=latest,enable=${{ inputs.tag-strategy == 'latest' && fromJSON(inputs.latest) }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
