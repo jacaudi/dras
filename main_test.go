@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,19 +41,14 @@ func TestRadarMode(t *testing.T) {
 }
 
 func TestCompareRadarData(t *testing.T) {
-	// Set up environment variables for feature alerts
-	t.Setenv("ALERT_ON_VCP", "true")
-	t.Setenv("ALERT_ON_STATUS", "true")
-	t.Setenv("ALERT_ON_OPERABILITY", "true")
-	t.Setenv("ALERT_ON_POWER_SOURCE", "true")
-	t.Setenv("ALERT_ON_GEN_STATE", "true")
-
-	// Re-evaluate alert variables to pick up new env values
-	alertOnVCP, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_VCP", "true"))
-	alertOnStatus, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_STATUS", "false"))
-	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_OPERABILITY", "false"))
-	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_POWER_SOURCE", "false"))
-	alertOnGenState, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_GEN_STATE", "false"))
+	// Create alert config with all alerts enabled
+	alertConfig := AlertConfig{
+		VCP:         true,
+		Status:      true,
+		Operability: true,
+		PowerSource: true,
+		GenState:    true,
+	}
 
 	oldData := &RadarData{
 		VCP:               "R35",
@@ -72,7 +66,7 @@ func TestCompareRadarData(t *testing.T) {
 		OperabilityStatus: "Functioning",
 	}
 
-	changed, message := compareRadarData(oldData, newData)
+	changed, message := compareRadarData(oldData, newData, alertConfig)
 	assert.True(t, changed)
 	assert.Contains(t, message, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
 	assert.Contains(t, message, "Power source changed from Commercial to Backup")
@@ -81,19 +75,14 @@ func TestCompareRadarData(t *testing.T) {
 }
 
 func TestCompareRadarData_Defaults(t *testing.T) {
-	// Unset all feature alert env vars to test defaults (only VCP should be true)
-	t.Setenv("ALERT_ON_VCP", "")
-	t.Setenv("ALERT_ON_STATUS", "")
-	t.Setenv("ALERT_ON_OPERABILITY", "")
-	t.Setenv("ALERT_ON_POWER_SOURCE", "")
-	t.Setenv("ALERT_ON_GEN_STATE", "")
-
-	// Re-evaluate alert variables to pick up default values
-	alertOnVCP, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_VCP", "true"))
-	alertOnStatus, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_STATUS", "false"))
-	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_OPERABILITY", "false"))
-	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_POWER_SOURCE", "false"))
-	alertOnGenState, _ = strconv.ParseBool(getEnvDefault("ALERT_ON_GEN_STATE", "false"))
+	// Create alert config with default values (only VCP should be true)
+	alertConfig := AlertConfig{
+		VCP:         true,
+		Status:      false,
+		Operability: false,
+		PowerSource: false,
+		GenState:    false,
+	}
 
 	oldData := &RadarData{
 		VCP:               "R35",
@@ -111,7 +100,7 @@ func TestCompareRadarData_Defaults(t *testing.T) {
 		OperabilityStatus: "Functioning",
 	}
 
-	changed, message := compareRadarData(oldData, newData)
+	changed, message := compareRadarData(oldData, newData, alertConfig)
 	assert.True(t, changed)
 	assert.Contains(t, message, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
 	assert.NotContains(t, message, "Power source changed")

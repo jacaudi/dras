@@ -17,19 +17,83 @@ import (
 	"github.com/nikoksr/notify/service/pushover"
 )
 
-var (
-	stationInput      = os.Getenv("STATION_IDS")
-	apiToken          = os.Getenv("PUSHOVER_API_TOKEN")
-	userKey           = os.Getenv("PUSHOVER_USER_KEY")
-	dryrun, _         = strconv.ParseBool(os.Getenv("DRYRUN"))
-	minuteInterval, _ = strconv.ParseInt(os.Getenv("INTERVAL"), 10, 64)
+// Config holds all configuration for the DRAS application.
+type Config struct {
+	StationInput      string
+	PushoverAPIToken  string
+	PushoverUserKey   string
+	DryRun           bool
+	CheckInterval    time.Duration
+	AlertConfig      AlertConfig
+}
 
-	alertOnVCP, _         = strconv.ParseBool(getEnvDefault("ALERT_VCP", "true"))
-	alertOnStatus, _      = strconv.ParseBool(getEnvDefault("ALERT_STATUS", "false"))
-	alertOnOperability, _ = strconv.ParseBool(getEnvDefault("ALERT_OPERABILITY", "false"))
-	alertOnPowerSource, _ = strconv.ParseBool(getEnvDefault("ALERT_POWER_SOURCE", "false"))
-	alertOnGenState, _    = strconv.ParseBool(getEnvDefault("ALERT_GEN_STATE", "false"))
-)
+// AlertConfig holds configuration for which events to alert on.
+type AlertConfig struct {
+	VCP         bool
+	Status      bool
+	Operability bool
+	PowerSource bool
+	GenState    bool
+}
+
+// LoadConfig loads configuration from environment variables with proper error handling.
+func LoadConfig() (*Config, error) {
+	cfg := &Config{}
+	var err error
+
+	// Required fields (checked later in checkEnvVars if not dryrun)
+	cfg.StationInput = os.Getenv("STATION_IDS")
+	cfg.PushoverAPIToken = os.Getenv("PUSHOVER_API_TOKEN")
+	cfg.PushoverUserKey = os.Getenv("PUSHOVER_USER_KEY")
+
+	// Parse DryRun
+	if dryrunStr := os.Getenv("DRYRUN"); dryrunStr != "" {
+		cfg.DryRun, err = strconv.ParseBool(dryrunStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DRYRUN value '%s': %w", dryrunStr, err)
+		}
+	}
+
+	// Parse CheckInterval
+	intervalStr := os.Getenv("INTERVAL")
+	if intervalStr != "" {
+		intervalMin, err := strconv.ParseInt(intervalStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid INTERVAL value '%s': %w", intervalStr, err)
+		}
+		cfg.CheckInterval = time.Duration(intervalMin) * time.Minute
+	} else {
+		cfg.CheckInterval = 10 * time.Minute // Default
+	}
+
+	// Parse alert configuration
+	cfg.AlertConfig.VCP, err = strconv.ParseBool(getEnvDefault("ALERT_VCP", "true"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ALERT_VCP value: %w", err)
+	}
+
+	cfg.AlertConfig.Status, err = strconv.ParseBool(getEnvDefault("ALERT_STATUS", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ALERT_STATUS value: %w", err)
+	}
+
+	cfg.AlertConfig.Operability, err = strconv.ParseBool(getEnvDefault("ALERT_OPERABILITY", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ALERT_OPERABILITY value: %w", err)
+	}
+
+	cfg.AlertConfig.PowerSource, err = strconv.ParseBool(getEnvDefault("ALERT_POWER_SOURCE", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ALERT_POWER_SOURCE value: %w", err)
+	}
+
+	cfg.AlertConfig.GenState, err = strconv.ParseBool(getEnvDefault("ALERT_GEN_STATE", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ALERT_GEN_STATE value: %w", err)
+	}
+
+	return cfg, nil
+}
 
 // RadarData represents the data for a radar.
 type RadarData struct {
@@ -53,16 +117,16 @@ func getEnvDefault(key, defaultVal string) string {
 
 // checkEnvVars checks if the required environment variables are set.
 // If any of the required variables are missing, it logs a fatal error.
-func checkEnvVars() {
+func checkEnvVars(cfg *Config) {
 	var missingVars []string
-	if !dryrun {
-		if stationInput == "" {
+	if !cfg.DryRun {
+		if cfg.StationInput == "" {
 			missingVars = append(missingVars, "STATION_IDS")
 		}
-		if apiToken == "" {
+		if cfg.PushoverAPIToken == "" {
 			missingVars = append(missingVars, "PUSHOVER_API_TOKEN")
 		}
-		if userKey == "" {
+		if cfg.PushoverUserKey == "" {
 			missingVars = append(missingVars, "PUSHOVER_USER_KEY")
 		}
 
@@ -167,10 +231,10 @@ func genStateSimp(input string) (string, error) {
 
 // compareRadarData compares the old and new radar data and returns whether there are any changes and the details of the changes.
 // It takes two pointers to RadarData structs as input and returns a boolean indicating if there are any changes and a string containing the details of the changes.
-func compareRadarData(oldData, newData *RadarData) (bool, string) {
+func compareRadarData(oldData, newData *RadarData, alertConfig AlertConfig) (bool, string) {
 	var changes []string
 
-	if alertOnVCP && oldData.VCP != newData.VCP {
+	if alertConfig.VCP && oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" || newData.VCP == "R31" {
 			changes = append(changes, "The Radar is in Clear Air Mode -- No Precipitation Detected")
 		} else if newData.VCP == "R12" || newData.VCP == "R212" {
@@ -184,19 +248,19 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 		}
 	}
 
-	if alertOnStatus && oldData.Status != newData.Status {
+	if alertConfig.Status && oldData.Status != newData.Status {
 		changes = append(changes, fmt.Sprintf("Radar status changed from %s to %s", oldData.Status, newData.Status))
 	}
 
-	if alertOnOperability && oldData.OperabilityStatus != newData.OperabilityStatus {
+	if alertConfig.Operability && oldData.OperabilityStatus != newData.OperabilityStatus {
 		changes = append(changes, fmt.Sprintf("Radar operability changed from %s to %s", oldData.OperabilityStatus, newData.OperabilityStatus))
 	}
 
-	if alertOnPowerSource && oldData.PowerSource != newData.PowerSource {
+	if alertConfig.PowerSource && oldData.PowerSource != newData.PowerSource {
 		changes = append(changes, fmt.Sprintf("Power source changed from %s to %s", oldData.PowerSource, newData.PowerSource))
 	}
 
-	if alertOnGenState && oldData.GenState != newData.GenState {
+	if alertConfig.GenState && oldData.GenState != newData.GenState {
 		changes = append(changes, fmt.Sprintf("Generator state changed from %s to %s", oldData.GenState, newData.GenState))
 	}
 
@@ -210,13 +274,13 @@ func compareRadarData(oldData, newData *RadarData) (bool, string) {
 // sendPushoverNotification sends a Pushover notification with the specified title and message.
 // It uses the Pushover service to send the notification.
 // The function returns an error if the notification fails to send, otherwise it returns nil.
-func sendPushoverNotification(title, message string) error {
+func sendPushoverNotification(title, message string, cfg *Config) error {
 
 	// Create a new Pushover service
-	pushoverService := pushover.New(apiToken)
+	pushoverService := pushover.New(cfg.PushoverAPIToken)
 
 	// Add a recipient
-	pushoverService.AddReceivers(userKey)
+	pushoverService.AddReceivers(cfg.PushoverUserKey)
 
 	// Create a new notification
 	notification := notify.New()
@@ -237,7 +301,7 @@ func sendPushoverNotification(title, message string) error {
 // push notification is sent using the sendPushoverNotification function.
 // The radar data and its mode are stored in the radarDataMap in memory.
 // Goroutines are used to perform the api call and data processing per station ID
-func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}) {
+func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[string]interface{}, cfg *Config) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -258,36 +322,45 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 				return
 			}
 
+			// Check if we need to initialize or if this is first run
 			mu.Lock()
 			if _, exists := radarDataMap[stationID]; !exists {
 				radarDataMap[stationID] = make(map[string]interface{})
 			}
-
 			lastRadarData, exists := radarDataMap[stationID]["last"]
-			if !exists || lastRadarData == nil {
+			isFirstRun := !exists || lastRadarData == nil
+			if isFirstRun {
 				radarDataMap[stationID]["last"] = newRadarData
-				mu.Unlock()
+			}
+			mu.Unlock()
+
+			// Handle first run outside of mutex
+			if isFirstRun {
 				initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
 				log.Printf("Initial radar data stored for station %s.", stationID)
-				if dryrun {
+				if cfg.DryRun {
 					log.Printf("Debug Pushover -- Title: DRAS Startup - Msg: %s\n", initialMessage)
 				} else {
-					if err := sendPushoverNotification("DRAS Startup", initialMessage); err != nil {
-						log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					if err := sendPushoverNotification("DRAS Startup", initialMessage, cfg); err != nil {
+						log.Printf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 					}
 				}
 				return
 			}
-			mu.Unlock()
 
-			changed, changeMessage := compareRadarData(lastRadarData.(*RadarData), newRadarData)
+			lastData, ok := lastRadarData.(*RadarData)
+			if !ok {
+				log.Printf("Error: invalid radar data type in cache for station %s\n", stationID)
+				return
+			}
+			changed, changeMessage := compareRadarData(lastData, newRadarData, cfg.AlertConfig)
 			if changed {
 				log.Printf("Radar data changed for station %s %s: %s\n", stationID, newRadarData.Name, changeMessage)
-				if dryrun {
+				if cfg.DryRun {
 					log.Printf("Debug Pushover -- Title: %s - Msg: %s\n", stationID, changeMessage)
 				} else {
-					if err := sendPushoverNotification(fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
-						log.Fatalf("Error sending Pushover alert for station %s: %v\n", stationID, err)
+					if err := sendPushoverNotification(fmt.Sprintf("%s Update", stationID), changeMessage, cfg); err != nil {
+						log.Printf("Error sending Pushover alert for station %s: %v\n", stationID, err)
 					}
 				}
 				mu.Lock()
@@ -309,29 +382,31 @@ func fetchAndReportRadarData(stationIDs []string, radarDataMap map[string]map[st
 // It sets the UserAgent to the DRAS GitHub repository and fetches and reports radar data.
 // It then starts a ticker to periodically update the radar data.
 func main() {
-	checkEnvVars()
+	// Load configuration
+	cfg, err := LoadConfig()
+	if err != nil {
+		log.Fatalf("Error loading configuration: %v", err)
+	}
+
+	checkEnvVars(cfg)
 	radarDataMap := make(map[string]map[string]interface{})
 	var stationIDs []string
 
-	if minuteInterval == 0 {
-		minuteInterval = 10
-	}
-
 	log.Println("DRAS -- Start Monitoring Service")
-	if dryrun {
+	if cfg.DryRun {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
 	} else {
-		stationIDs = sanitizeStationIDs(stationInput)
+		stationIDs = sanitizeStationIDs(cfg.StationInput)
 	}
 	log.Println("Set UserAgent to https://github.com/jacaudi/dras")
-	config := nws.Config{}
-	config.SetUserAgent("dras/1.0 (+https://github.com/jacaudi/dras)")
-	fetchAndReportRadarData(stationIDs, radarDataMap)
+	nwsConfig := nws.Config{}
+	nwsConfig.SetUserAgent("dras/1.0 (+https://github.com/jacaudi/dras)")
+	fetchAndReportRadarData(stationIDs, radarDataMap, cfg)
 
-	ticker := time.NewTicker(time.Duration(minuteInterval) * time.Minute)
+	ticker := time.NewTicker(cfg.CheckInterval)
 	defer ticker.Stop()
 	for range ticker.C {
 		log.Println("DRAS -- Updating Radar Data")
-		fetchAndReportRadarData(stationIDs, radarDataMap)
+		fetchAndReportRadarData(stationIDs, radarDataMap, cfg)
 	}
 }
