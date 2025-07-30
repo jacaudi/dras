@@ -21,7 +21,7 @@ func TestRaceConditions(t *testing.T) {
 	cfg := &config.Config{
 		DryRun:        true,
 		CheckInterval: 1 * time.Millisecond,
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP:         true,
 			Status:      true,
 			Operability: true,
@@ -197,7 +197,7 @@ func TestRaceWithRealMonitoring(t *testing.T) {
 	cfg := &config.Config{
 		DryRun:        true,
 		CheckInterval: 1 * time.Millisecond, // Very fast to trigger races
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP: true,
 		},
 	}

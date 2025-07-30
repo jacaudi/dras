@@ -133,14 +133,8 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 		return fmt.Errorf("invalid radar data type in cache for station %s", stationID)
 	}
 
-	// Convert config.AlertConfig to radar.AlertConfig
-	alertConfig := radar.AlertConfig{
-		VCP:         m.config.AlertConfig.VCP,
-		Status:      m.config.AlertConfig.Status,
-		Operability: m.config.AlertConfig.Operability,
-		PowerSource: m.config.AlertConfig.PowerSource,
-		GenState:    m.config.AlertConfig.GenState,
-	}
+	// Use alert configuration directly (no conversion needed since config uses radar.AlertConfig)
+	alertConfig := m.config.AlertConfig
 
 	changed, changeMessage := radar.CompareData(lastData, newRadarData, alertConfig)
 	if changed {

@@ -20,16 +20,17 @@ func CompareData(oldData, newData *Data, alertConfig AlertConfig) (bool, string)
 	var changes []string
 
 	if alertConfig.VCP && oldData.VCP != newData.VCP {
-		if newData.VCP == "R35" || newData.VCP == "R31" {
-			changes = append(changes, "Clear Air Mode Active")
-		} else if newData.VCP == "R12" || newData.VCP == "R212" {
-			changes = append(changes, "Precipitation Mode Active")
-		} else if newData.VCP == "R215" {
-			changes = append(changes, "Precipitation Mode (Vertical Scanning Emphasis) Active")
-		} else if newData.VCP == "R112" {
-			changes = append(changes, "Precipitation Mode (Velocity Scanning Emphasis) Active")
+		// Try to get detailed VCP description
+		newModeDesc := getVCPDescription(newData.VCP)
+		if newModeDesc != "" {
+			changes = append(changes, newModeDesc)
 		} else {
-			changes = append(changes, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP))
+			// Fall back to basic mode detection or raw VCP change
+			if mode, err := GetMode(newData.VCP); err == nil {
+				changes = append(changes, fmt.Sprintf("%s Mode Active", mode))
+			} else {
+				changes = append(changes, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP))
+			}
 		}
 	}
 
@@ -54,4 +55,20 @@ func CompareData(oldData, newData *Data, alertConfig AlertConfig) (bool, string)
 	}
 
 	return false, ""
+}
+
+// getVCPDescription returns detailed descriptions for specific VCP modes
+func getVCPDescription(vcp string) string {
+	switch vcp {
+	case "R35", "R31":
+		return "Clear Air Mode Active"
+	case "R12", "R212":
+		return "Precipitation Mode Active"
+	case "R215":
+		return "Precipitation Mode (Vertical Scanning Emphasis) Active"
+	case "R112":
+		return "Precipitation Mode (Velocity Scanning Emphasis) Active"
+	default:
+		return "" // No specific description available
+	}
 }

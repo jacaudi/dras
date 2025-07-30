@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
-	"github.com/nikoksr/notify"
+	notify_lib "github.com/nikoksr/notify"
 	"github.com/nikoksr/notify/service/pushover"
 )
 
@@ -22,16 +23,7 @@ type Config struct {
 	DryRun           bool
 	CheckInterval    time.Duration
 	LogLevel         string
-	AlertConfig      AlertConfig
-}
-
-// AlertConfig holds configuration for which events to alert on.
-type AlertConfig struct {
-	VCP         bool
-	Status      bool
-	Operability bool
-	PowerSource bool
-	GenState    bool
+	AlertConfig      radar.AlertConfig
 }
 
 // Load loads configuration from environment variables with proper error handling.
@@ -68,33 +60,30 @@ func Load() (*Config, error) {
 	cfg.LogLevel = getEnvDefault("LOG_LEVEL", "INFO")
 
 	// Parse alert configuration
-	cfg.AlertConfig.VCP, err = strconv.ParseBool(getEnvDefault("ALERT_VCP", "true"))
+	cfg.AlertConfig.VCP, err = parseBoolEnv("ALERT_VCP", "true")
 	if err != nil {
-		return nil, fmt.Errorf("invalid ALERT_VCP value: %w", err)
+		return nil, err
 	}
 
-	cfg.AlertConfig.Status, err = strconv.ParseBool(getEnvDefault("ALERT_STATUS", "false"))
+	cfg.AlertConfig.Status, err = parseBoolEnv("ALERT_STATUS", "false")
 	if err != nil {
-		return nil, fmt.Errorf("invalid ALERT_STATUS value: %w", err)
+		return nil, err
 	}
 
-	cfg.AlertConfig.Operability, err = strconv.ParseBool(getEnvDefault("ALERT_OPERABILITY", "false"))
+	cfg.AlertConfig.Operability, err = parseBoolEnv("ALERT_OPERABILITY", "false")
 	if err != nil {
-		return nil, fmt.Errorf("invalid ALERT_OPERABILITY value: %w", err)
+		return nil, err
 	}
 
-	cfg.AlertConfig.PowerSource, err = strconv.ParseBool(getEnvDefault("ALERT_POWER_SOURCE", "false"))
+	cfg.AlertConfig.PowerSource, err = parseBoolEnv("ALERT_POWER_SOURCE", "false")
 	if err != nil {
-		return nil, fmt.Errorf("invalid ALERT_POWER_SOURCE value: %w", err)
+		return nil, err
 	}
 
-	cfg.AlertConfig.GenState, err = strconv.ParseBool(getEnvDefault("ALERT_GEN_STATE", "false"))
+	cfg.AlertConfig.GenState, err = parseBoolEnv("ALERT_GEN_STATE", "false")
 	if err != nil {
-		return nil, fmt.Errorf("invalid ALERT_GEN_STATE value: %w", err)
+		return nil, err
 	}
-
-	// Parse log level
-	cfg.LogLevel = getEnvDefault("LOG_LEVEL", "INFO")
 
 	return cfg, nil
 }
@@ -114,13 +103,13 @@ func (c *Config) Validate() error {
 
 		if c.PushoverAPIToken == "" {
 			errors = append(errors, "PUSHOVER_API_TOKEN is required")
-		} else if err := validatePushoverToken(c.PushoverAPIToken); err != nil {
+		} else if err := notify.ValidateAPIToken(c.PushoverAPIToken); err != nil {
 			errors = append(errors, fmt.Sprintf("PUSHOVER_API_TOKEN validation failed: %v", err))
 		}
 
 		if c.PushoverUserKey == "" {
 			errors = append(errors, "PUSHOVER_USER_KEY is required")
-		} else if err := validatePushoverUserKey(c.PushoverUserKey); err != nil {
+		} else if err := notify.ValidateUserKey(c.PushoverUserKey); err != nil {
 			errors = append(errors, fmt.Sprintf("PUSHOVER_USER_KEY validation failed: %v", err))
 		}
 	}
@@ -153,7 +142,7 @@ func (c *Config) ValidateConnectivity(ctx context.Context) error {
 	pushoverService := pushover.New(c.PushoverAPIToken)
 	pushoverService.AddReceivers(c.PushoverUserKey)
 
-	notification := notify.New()
+	notification := notify_lib.New()
 	notification.UseServices(pushoverService)
 
 	// We can't actually send a test notification without bothering users,
@@ -193,38 +182,22 @@ func validateStationIDs(stationInput string) error {
 	return nil
 }
 
-// validatePushoverToken checks if the Pushover API token is in the correct format
-func validatePushoverToken(token string) error {
-	// Pushover API tokens are 30 characters long, alphanumeric
-	tokenRegex := regexp.MustCompile(`^[a-zA-Z0-9]{30}$`)
-	if !tokenRegex.MatchString(token) {
-		return fmt.Errorf("must be 30 alphanumeric characters")
-	}
-	return nil
-}
-
-// validatePushoverUserKey checks if the Pushover user key is in the correct format
-func validatePushoverUserKey(userKey string) error {
-	// Pushover user keys are 30 characters long, alphanumeric
-	userKeyRegex := regexp.MustCompile(`^[a-zA-Z0-9]{30}$`)
-	if !userKeyRegex.MatchString(userKey) {
-		return fmt.Errorf("must be 30 alphanumeric characters")
-	}
-	return nil
+// validLogLevels contains all valid log levels for O(1) lookup
+var validLogLevels = map[string]bool{
+	"DEBUG": true,
+	"INFO":  true,
+	"WARN":  true,
+	"ERROR": true,
+	"FATAL": true,
 }
 
 // validateLogLevel checks if the log level is valid
 func validateLogLevel(level string) error {
-	validLevels := []string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}
 	levelUpper := strings.ToUpper(level)
-
-	for _, validLevel := range validLevels {
-		if levelUpper == validLevel {
-			return nil
-		}
+	if !validLogLevels[levelUpper] {
+		return fmt.Errorf("must be one of: DEBUG, INFO, WARN, ERROR, FATAL")
 	}
-
-	return fmt.Errorf("must be one of: %s", strings.Join(validLevels, ", "))
+	return nil
 }
 
 // String returns a formatted configuration summary
@@ -290,4 +263,13 @@ func getEnvDefault(key, defaultVal string) string {
 		return defaultVal
 	}
 	return val
+}
+
+// parseBoolEnv parses a boolean environment variable with error handling
+func parseBoolEnv(key, defaultVal string) (bool, error) {
+	val, err := strconv.ParseBool(getEnvDefault(key, defaultVal))
+	if err != nil {
+		return false, fmt.Errorf("invalid %s value: %w", key, err)
+	}
+	return val, nil
 }

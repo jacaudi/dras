@@ -15,7 +15,7 @@ func TestConcurrentStationProcessing(t *testing.T) {
 	cfg := &config.Config{
 		DryRun:        true,
 		CheckInterval: 10 * time.Millisecond,
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP: true,
 		},
 	}
@@ -150,7 +150,7 @@ func TestConcurrentStationProcessing(t *testing.T) {
 func TestGoroutineErrorHandling(t *testing.T) {
 	cfg := &config.Config{
 		DryRun: true,
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP: true,
 		},
 	}
@@ -201,7 +201,7 @@ func TestMonitorStartStop(t *testing.T) {
 	cfg := &config.Config{
 		DryRun:        true,
 		CheckInterval: 100 * time.Millisecond, // Reasonable interval for testing
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP: true,
 		},
 	}

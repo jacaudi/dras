@@ -15,7 +15,7 @@ func BenchmarkMonitorMemoryUsage(b *testing.B) {
 	cfg := &config.Config{
 		DryRun:        true,
 		CheckInterval: 1 * time.Millisecond, // Fast for benchmarking
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP:         true,
 			Status:      false,
 			Operability: false,
@@ -66,7 +66,7 @@ func BenchmarkMonitorMemoryUsage(b *testing.B) {
 func BenchmarkConcurrentProcessing(b *testing.B) {
 	cfg := &config.Config{
 		DryRun: true,
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP: true,
 		},
 	}
@@ -131,7 +131,7 @@ func BenchmarkConfigValidation(b *testing.B) {
 		PushoverUserKey:  "test-key",
 		DryRun:           false,
 		CheckInterval:    10 * time.Minute,
-		AlertConfig: config.AlertConfig{
+		AlertConfig: radar.AlertConfig{
 			VCP:         true,
 			Status:      true,
 			Operability: false,
