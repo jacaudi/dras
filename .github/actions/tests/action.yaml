@@ -32,4 +32,4 @@ runs:
       shell: bash
       run: |
         go version
-        go test -json-bench=. ./internal/... -benchmem
+        go test -json -bench=. ./internal/... -benchmem
