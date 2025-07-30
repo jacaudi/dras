@@ -25,29 +25,30 @@ type Info struct {
 
 // Get returns the version information
 func Get() Info {
-	return Info{
-		Version:   Version,
-		BuildTime: BuildTime,
-		GitCommit: GitCommit,
-		GitBranch: GitBranch,
-		GoVersion: GoVersion,
-	}
+	return Info{Version, BuildTime, GitCommit, GitBranch, GoVersion}
 }
 
 // String returns a formatted version string
 func (i Info) String() string {
-	if i.Version == "development" {
-		return fmt.Sprintf("DRAS %s (commit: %s, branch: %s, go: %s)",
-			i.Version, i.GitCommit, i.GitBranch, i.GoVersion)
+	isDev := i.Version == "development"
+	version := i.Version
+	if !isDev {
+		version = "v" + version
 	}
-	return fmt.Sprintf("DRAS v%s (built: %s, commit: %s, go: %s)",
-		i.Version, i.BuildTime, i.GitCommit, i.GoVersion)
+	
+	if isDev {
+		return fmt.Sprintf("DRAS %s (commit: %s, branch: %s, go: %s)",
+			version, i.GitCommit, i.GitBranch, i.GoVersion)
+	}
+	return fmt.Sprintf("DRAS %s (built: %s, commit: %s, go: %s)",
+		version, i.BuildTime, i.GitCommit, i.GoVersion)
 }
 
 // Short returns a short version string
 func (i Info) Short() string {
-	if i.Version == "development" {
-		return fmt.Sprintf("DRAS %s", i.Version)
+	version := i.Version
+	if version != "development" {
+		version = "v" + version
 	}
-	return fmt.Sprintf("DRAS v%s", i.Version)
+	return fmt.Sprintf("DRAS %s", version)
 }

@@ -28,8 +28,12 @@ COPY . .
 # Download Go modules
 RUN go mod tidy
 
-# Build the Go application
-RUN go build -o dras main.go
+# Build the Go application with version information
+RUN go build -ldflags "\
+    -X github.com/jacaudi/dras/internal/version.Version=${VERSION} \
+    -X github.com/jacaudi/dras/internal/version.BuildTime=${BUILDTIME} \
+    -X github.com/jacaudi/dras/internal/version.GitCommit=${REVISION}" \
+    -o dras main.go
 
 # Final Stage
 FROM scratch AS final
