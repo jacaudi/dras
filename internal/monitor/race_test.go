@@ -1,3 +1,4 @@
+//go:build race
 // +build race
 
 package monitor
@@ -43,7 +44,7 @@ func TestRaceConditions(t *testing.T) {
 			go func(iteration int) {
 				defer wg.Done()
 				stationID := stations[iteration%len(stations)]
-				
+
 				// Simulate the operations that happen in processStation
 				monitor.mu.Lock()
 				if _, exists := monitor.radarDataMap[stationID]; !exists {
@@ -51,7 +52,7 @@ func TestRaceConditions(t *testing.T) {
 				}
 				lastRadarData, exists := monitor.radarDataMap[stationID]["last"]
 				isFirstRun := !exists || lastRadarData == nil
-				
+
 				newData := &radar.Data{
 					Name:              stationID,
 					VCP:               "R31",
@@ -61,7 +62,7 @@ func TestRaceConditions(t *testing.T) {
 					PowerSource:       "Utility",
 					GenState:          "Off",
 				}
-				
+
 				if isFirstRun {
 					monitor.radarDataMap[stationID]["last"] = newData
 				} else {
@@ -109,7 +110,7 @@ func TestRaceConditions(t *testing.T) {
 					monitor.mu.Lock()
 					if data, exists := monitor.radarDataMap["KATX"]["last"]; exists {
 						if radarData, ok := data.(*radar.Data); ok {
-							_ = radarData.VCP // Read access
+							_ = radarData.VCP    // Read access
 							_ = radarData.Status // Read access
 						}
 					}
@@ -126,7 +127,7 @@ func TestRaceConditions(t *testing.T) {
 				for j := 0; j < 100; j++ {
 					vcps := []string{"R31", "R35", "R12", "R112", "R212", "R215"}
 					statuses := []string{"Online", "Offline", "Maintenance"}
-					
+
 					newData := &radar.Data{
 						Name:              "KATX",
 						VCP:               vcps[j%len(vcps)],
@@ -136,7 +137,7 @@ func TestRaceConditions(t *testing.T) {
 						PowerSource:       "Utility",
 						GenState:          "Off",
 					}
-					
+
 					monitor.mu.Lock()
 					monitor.radarDataMap["KATX"]["last"] = newData // Write access
 					monitor.mu.Unlock()
@@ -161,12 +162,12 @@ func TestRaceConditions(t *testing.T) {
 			go func(iteration int) {
 				defer wg.Done()
 				stationID := stations[iteration%len(stations)]
-				
+
 				monitor.mu.Lock()
 				if _, exists := monitor.radarDataMap[stationID]; !exists {
 					monitor.radarDataMap[stationID] = make(map[string]interface{})
 				}
-				
+
 				// Simulate rapid updates
 				for k := 0; k < 10; k++ {
 					monitor.radarDataMap[stationID]["last"] = &radar.Data{

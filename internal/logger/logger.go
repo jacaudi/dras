@@ -153,7 +153,7 @@ func (fl *FieldLogger) formatWithFields(format string, args ...interface{}) stri
 	if len(fl.fields) == 0 {
 		return message
 	}
-	
+
 	var fieldStrings []string
 	for key, value := range fl.fields {
 		fieldStrings = append(fieldStrings, fmt.Sprintf("%s=%s", key, value))

@@ -30,11 +30,11 @@ func (s *Service) ValidateCredentials() error {
 	if err := ValidateAPIToken(s.apiToken); err != nil {
 		return fmt.Errorf("invalid API token: %w", err)
 	}
-	
+
 	if err := ValidateUserKey(s.userKey); err != nil {
 		return fmt.Errorf("invalid user key: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -43,22 +43,22 @@ func ValidateAPIToken(token string) error {
 	if token == "" {
 		return errors.New("API token cannot be empty")
 	}
-	
+
 	// Pushover API tokens are 30 characters long, alphanumeric
 	if len(token) != 30 {
 		return errors.New("API token must be exactly 30 characters long")
 	}
-	
+
 	// Check for alphanumeric characters only
 	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+$`, token)
 	if err != nil {
 		return fmt.Errorf("error validating API token format: %w", err)
 	}
-	
+
 	if !matched {
 		return errors.New("API token must contain only alphanumeric characters")
 	}
-	
+
 	return nil
 }
 
@@ -67,22 +67,22 @@ func ValidateUserKey(userKey string) error {
 	if userKey == "" {
 		return errors.New("user key cannot be empty")
 	}
-	
+
 	// Pushover user keys are 30 characters long, alphanumeric
 	if len(userKey) != 30 {
 		return errors.New("user key must be exactly 30 characters long")
 	}
-	
+
 	// Check for alphanumeric characters only
 	matched, err := regexp.MatchString(`^[a-zA-Z0-9]+$`, userKey)
 	if err != nil {
 		return fmt.Errorf("error validating user key format: %w", err)
 	}
-	
+
 	if !matched {
 		return errors.New("user key must contain only alphanumeric characters")
 	}
-	
+
 	return nil
 }
 

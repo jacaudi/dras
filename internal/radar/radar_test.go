@@ -53,10 +53,10 @@ func TestSanitizeStationIDs(t *testing.T) {
 		{"KATX, KRAX ; KBGM", []string{"KATX", "KRAX", "KBGM"}},
 		{"KATX", []string{"KATX"}},
 		{"", []string{}},
-		{"katx krax", []string{"KATX", "KRAX"}}, // test lowercase conversion
+		{"katx krax", []string{"KATX", "KRAX"}},           // test lowercase conversion
 		{"KATX, invalid, KRAX", []string{"KATX", "KRAX"}}, // test filtering invalid
-		{"K1TX", []string{}}, // test invalid - contains number
-		{"ATXX", []string{"ATXX"}}, // test valid non-K station
+		{"K1TX", []string{}},                              // test invalid - contains number
+		{"ATXX", []string{"ATXX"}},                        // test valid non-K station
 	}
 
 	for _, tt := range tests {

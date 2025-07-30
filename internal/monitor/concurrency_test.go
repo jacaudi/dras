@@ -123,11 +123,11 @@ func TestConcurrentStationProcessing(t *testing.T) {
 					monitor.mu.Lock()
 					monitor.radarDataMap["KATX"]["last"] = newData
 					monitor.mu.Unlock()
-					
+
 					countMu.Lock()
 					writeCount++
 					countMu.Unlock()
-					
+
 					time.Sleep(1 * time.Millisecond)
 				}
 			}(i)

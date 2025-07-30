@@ -145,11 +145,11 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	changed, changeMessage := radar.CompareData(lastData, newRadarData, alertConfig)
 	if changed {
 		logger.WithFields(map[string]string{
-			"station": stationID,
+			"station":      stationID,
 			"station_name": newRadarData.Name,
 			"change":       changeMessage,
 		}).Info("Radar data changed")
-		
+
 		if m.config.DryRun {
 			stationLogger.Debug("Would send change notification: %s", changeMessage)
 		} else {

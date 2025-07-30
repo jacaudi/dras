@@ -146,9 +146,9 @@ func TestCompareData(t *testing.T) {
 
 		// Check that all changes are reported
 		expectedStrings := []string{
-			"Precipitation Mode -- Precipitation Detected",
-			"status changed from Online to Offline",
-			"operability changed from Normal to Maintenance",
+			"Precipitation Mode Active",
+			"Radar status changed from Online to Offline",
+			"Radar operability changed from Normal to Maintenance",
 			"Power source changed from Utility to Generator",
 			"Generator state changed from Off to On",
 		}

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package radar
@@ -21,7 +22,7 @@ func TestRealNWSIntegration(t *testing.T) {
 	t.Run("fetch real radar data", func(t *testing.T) {
 		// Test with known radar stations
 		testStations := []string{"KATX", "KRAX"} // Seattle, WA and Raleigh, NC
-		
+
 		for _, stationID := range testStations {
 			t.Run("station_"+stationID, func(t *testing.T) {
 				data, err := service.FetchData(stationID)
@@ -58,7 +59,7 @@ func TestRealNWSIntegration(t *testing.T) {
 					}
 				}
 
-				t.Logf("Station %s: Name=%s, VCP=%s, Mode=%s, Status=%s, PowerSource=%s", 
+				t.Logf("Station %s: Name=%s, VCP=%s, Mode=%s, Status=%s, PowerSource=%s",
 					stationID, data.Name, data.VCP, data.Mode, data.Status, data.PowerSource)
 			})
 		}
@@ -85,7 +86,7 @@ func TestRealNWSIntegration(t *testing.T) {
 		}
 
 		duration := time.Since(start)
-		t.Logf("Fetched %d stations in %v (avg: %v per station)", 
+		t.Logf("Fetched %d stations in %v (avg: %v per station)",
 			len(stations), duration, duration/time.Duration(len(stations)))
 
 		// Reasonable performance expectation (adjust based on network)
@@ -131,7 +132,7 @@ func TestRealDataComparison(t *testing.T) {
 		}
 
 		changed, message := CompareData(initialData, laterData, alertConfig)
-		
+
 		if changed {
 			t.Logf("Data changed for %s: %s", stationID, message)
 		} else {
@@ -161,7 +162,7 @@ func TestSanitizeStationIDsWithRealData(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run("input_"+tc.input, func(t *testing.T) {
 			result := SanitizeStationIDs(tc.input)
-			
+
 			if len(result) != len(tc.expected) {
 				t.Errorf("Expected %d stations, got %d", len(tc.expected), len(result))
 				return
@@ -183,7 +184,7 @@ func TestNWSConnectivity(t *testing.T) {
 	}
 
 	service := New()
-	
+
 	// Quick connectivity test
 	_, err := service.FetchData("KATX")
 	if err != nil {

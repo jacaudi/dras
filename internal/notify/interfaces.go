@@ -35,20 +35,20 @@ func NewMockNotifier() *MockNotifier {
 // SendNotification simulates sending a notification
 func (m *MockNotifier) SendNotification(ctx context.Context, title, message string) error {
 	m.callCount++
-	
+
 	if m.shouldError {
 		return errors.New("mock notification error")
 	}
-	
+
 	if err, exists := m.errors[title]; exists {
 		return err
 	}
-	
+
 	m.notifications = append(m.notifications, Notification{
 		Title:   title,
 		Message: message,
 	})
-	
+
 	return nil
 }
 

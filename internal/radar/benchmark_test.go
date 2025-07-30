@@ -14,7 +14,7 @@ type MockNWS struct {
 // BenchmarkGetMode tests performance of VCP to mode conversion
 func BenchmarkGetMode(b *testing.B) {
 	vcps := []string{"R31", "R35", "R12", "R112", "R212", "R215"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		vcp := vcps[i%len(vcps)]
@@ -30,7 +30,7 @@ func BenchmarkSanitizeStationIDs(b *testing.B) {
 		"KATX; KRAX, KBGM ; KTLX   KFFC",
 		"KATX,KRAX,KBGM,KTLX,KFFC,KJAX,KMLB,KTBW,KMHX,KAKQ",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		input := testInputs[i%len(testInputs)]
@@ -77,7 +77,7 @@ func BenchmarkCompareData(b *testing.B) {
 // BenchmarkConcurrentRadarProcessing simulates concurrent radar data processing
 func BenchmarkConcurrentRadarProcessing(b *testing.B) {
 	stationIDs := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
-	
+
 	b.Run("Sequential", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

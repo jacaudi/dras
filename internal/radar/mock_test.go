@@ -81,7 +81,7 @@ func TestMockDataFetcher(t *testing.T) {
 func TestServiceImplementsDataFetcher(t *testing.T) {
 	// Test that Service implements DataFetcher interface
 	var _ DataFetcher = &Service{}
-	
+
 	// Test that MockDataFetcher implements DataFetcher interface
 	var _ DataFetcher = &MockDataFetcher{}
 }

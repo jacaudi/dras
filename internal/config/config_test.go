@@ -120,8 +120,8 @@ func TestConfig_Validate(t *testing.T) {
 			DryRun:           false,
 			StationInput:     "KATX",
 			PushoverAPIToken: "abcdefghijklmnopqrstuvwxyz1234", // 30 alphanumeric chars
-			PushoverUserKey:  "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", // 30 alphanumeric chars  
-			CheckInterval:    5 * time.Minute,                   // Ensure minimum interval is met
+			PushoverUserKey:  "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234", // 30 alphanumeric chars
+			CheckInterval:    5 * time.Minute,                  // Ensure minimum interval is met
 		}
 		if err := cfg.Validate(); err != nil {
 			t.Errorf("Validation should pass with all required fields: %v", err)

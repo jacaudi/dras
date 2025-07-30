@@ -37,15 +37,15 @@ func (m *MockDataFetcher) SetError(stationID string, err error) {
 // FetchData returns the mock response or error
 func (m *MockDataFetcher) FetchData(stationID string) (*Data, error) {
 	m.callCount++
-	
+
 	if err, exists := m.errors[stationID]; exists {
 		return nil, err
 	}
-	
+
 	if response, exists := m.responses[stationID]; exists {
 		return response, nil
 	}
-	
+
 	// Default response if none set
 	return &Data{
 		Name:              stationID,

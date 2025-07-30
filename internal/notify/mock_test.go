@@ -119,7 +119,7 @@ func TestMockNotifier(t *testing.T) {
 func TestNotifierInterface(t *testing.T) {
 	// Test that Service implements Notifier interface
 	var _ Notifier = &Service{}
-	
+
 	// Test that MockNotifier implements Notifier interface
 	var _ Notifier = &MockNotifier{}
 }

@@ -117,7 +117,7 @@ func SanitizeStationIDs(stationInput string) []string {
 	// Define a regular expression to split by space, comma, or semicolon
 	re := regexp.MustCompile(`[ ,;]+`)
 	stationIDs := re.Split(stationInput, -1)
-	
+
 	var validStations []string
 	for _, stationID := range stationIDs {
 		trimmed := strings.TrimSpace(stationID)
@@ -139,7 +139,7 @@ func ValidateStationID(stationID string) bool {
 	if len(stationID) != 4 {
 		return false
 	}
-	
+
 	// US radar stations typically start with 'K'
 	// Some exceptions exist but this covers 99% of cases
 	if !strings.HasPrefix(stationID, "K") {
@@ -151,13 +151,13 @@ func ValidateStationID(stationID string) bool {
 			}
 		}
 	}
-	
+
 	// Validate all characters are uppercase letters
 	for _, char := range stationID {
 		if char < 'A' || char > 'Z' {
 			return false
 		}
 	}
-	
+
 	return true
 }

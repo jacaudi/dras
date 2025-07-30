@@ -8,7 +8,7 @@ import (
 
 func TestGet(t *testing.T) {
 	info := Get()
-	
+
 	// Verify that all fields are populated
 	if info.Version == "" {
 		t.Error("Version should not be empty")
@@ -25,7 +25,7 @@ func TestGet(t *testing.T) {
 	if info.GoVersion == "" {
 		t.Error("GoVersion should not be empty")
 	}
-	
+
 	// Verify GoVersion matches runtime
 	if info.GoVersion != runtime.Version() {
 		t.Errorf("Expected GoVersion to be %s, got %s", runtime.Version(), info.GoVersion)
@@ -65,7 +65,7 @@ func TestInfo_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.info.String()
-			
+
 			for _, expected := range tt.contains {
 				if !strings.Contains(result, expected) {
 					t.Errorf("String() result should contain %q, got: %s", expected, result)

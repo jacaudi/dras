@@ -57,7 +57,7 @@ func main() {
 	if !cfg.DryRun {
 		logger.Debug("Initializing notification service")
 		notifyService = notify.New(cfg.PushoverAPIToken, cfg.PushoverUserKey)
-		
+
 		// Validate Pushover credentials
 		if err := notifyService.ValidateCredentials(); err != nil {
 			logger.Fatal("Pushover credentials validation failed: %v", err)

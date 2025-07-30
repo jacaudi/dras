@@ -98,7 +98,7 @@ func BenchmarkConcurrentProcessing(b *testing.B) {
 		radarService := radar.New()
 		var notifyService *notify.Service
 		monitor := New(radarService, notifyService, cfg)
-		
+
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
 
 		b.ResetTimer()
@@ -129,8 +129,8 @@ func BenchmarkConfigValidation(b *testing.B) {
 		StationInput:     "KATX,KRAX,KBGM",
 		PushoverAPIToken: "test-token",
 		PushoverUserKey:  "test-key",
-		DryRun:          false,
-		CheckInterval:   10 * time.Minute,
+		DryRun:           false,
+		CheckInterval:    10 * time.Minute,
 		AlertConfig: config.AlertConfig{
 			VCP:         true,
 			Status:      true,
