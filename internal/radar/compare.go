@@ -21,13 +21,13 @@ func CompareData(oldData, newData *Data, alertConfig AlertConfig) (bool, string)
 
 	if alertConfig.VCP && oldData.VCP != newData.VCP {
 		if newData.VCP == "R35" || newData.VCP == "R31" {
-			changes = append(changes, "The Radar is in Clear Air Mode -- No Precipitation Detected")
+			changes = append(changes, "Clear Air Mode Active")
 		} else if newData.VCP == "R12" || newData.VCP == "R212" {
-			changes = append(changes, "The Radar is in Precipitation Mode -- Precipitation Detected")
+			changes = append(changes, "Precipitation Mode Active")
 		} else if newData.VCP == "R215" {
-			changes = append(changes, "The Radar is in Precipitation Mode (Vertical Scanning Emphasis) -- Precipitation Detected")
+			changes = append(changes, "Precipitation Mode (Vertical Scanning Emphasis) Active")
 		} else if newData.VCP == "R112" {
-			changes = append(changes, "The Radar is in Precipitation Mode (Velocity  Scanning Emphasis) -- Precipitation Detected")
+			changes = append(changes, "Precipitation Mode (Velocity Scanning Emphasis) Active")
 		} else {
 			changes = append(changes, fmt.Sprintf("Radar mode changed from %s to %s", oldData.VCP, newData.VCP))
 		}
