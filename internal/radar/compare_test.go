@@ -61,7 +61,7 @@ func TestCompareData(t *testing.T) {
 		if !changed {
 			t.Error("Expected changes to be detected")
 		}
-		if !strings.Contains(message, "Precipitation Mode -- Precipitation Detected") {
+		if !strings.Contains(message, "Precipitation Mode Active") {
 			t.Errorf("Expected precipitation message, got %q", message)
 		}
 	})
@@ -93,7 +93,7 @@ func TestCompareData(t *testing.T) {
 		if !changed {
 			t.Error("Expected changes to be detected")
 		}
-		if !strings.Contains(message, "Clear Air Mode -- No Precipitation Detected") {
+		if !strings.Contains(message, "Clear Air Mode Active") {
 			t.Errorf("Expected clear air message, got %q", message)
 		}
 	})
