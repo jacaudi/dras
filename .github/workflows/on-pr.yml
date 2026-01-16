@@ -8,12 +8,16 @@ on:
       - reopened
       - synchronize
 
-jobs:        
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+jobs:
+  lint:
+    uses: jacaudi/github-actions/.github/workflows/lint.yml@main
+    with:
+      go: true
+    secrets: inherit
 
-      - name: Tests
-        uses: ./.github/actions/tests
+  test:
+    uses: jacaudi/github-actions/.github/workflows/test.yml@main
+    with:
+      framework: go
+      coverage: true
+    secrets: inherit
