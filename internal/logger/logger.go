@@ -165,7 +165,7 @@ func (fl *FieldLogger) formatWithFields(format string, args ...interface{}) stri
 func (fl *FieldLogger) Debug(format string, args ...interface{}) {
 	if fl.logger.shouldLog(DEBUG) {
 		message := fl.formatWithFields(format, args...)
-		fl.logger.logger.Print(fl.logger.formatMessage(DEBUG, message))
+		fl.logger.logger.Print(fl.logger.formatMessage(DEBUG, "%s", message))
 	}
 }
 
@@ -173,7 +173,7 @@ func (fl *FieldLogger) Debug(format string, args ...interface{}) {
 func (fl *FieldLogger) Info(format string, args ...interface{}) {
 	if fl.logger.shouldLog(INFO) {
 		message := fl.formatWithFields(format, args...)
-		fl.logger.logger.Print(fl.logger.formatMessage(INFO, message))
+		fl.logger.logger.Print(fl.logger.formatMessage(INFO, "%s", message))
 	}
 }
 
@@ -181,7 +181,7 @@ func (fl *FieldLogger) Info(format string, args ...interface{}) {
 func (fl *FieldLogger) Warn(format string, args ...interface{}) {
 	if fl.logger.shouldLog(WARN) {
 		message := fl.formatWithFields(format, args...)
-		fl.logger.logger.Print(fl.logger.formatMessage(WARN, message))
+		fl.logger.logger.Print(fl.logger.formatMessage(WARN, "%s", message))
 	}
 }
 
@@ -189,7 +189,7 @@ func (fl *FieldLogger) Warn(format string, args ...interface{}) {
 func (fl *FieldLogger) Error(format string, args ...interface{}) {
 	if fl.logger.shouldLog(ERROR) {
 		message := fl.formatWithFields(format, args...)
-		fl.logger.logger.Print(fl.logger.formatMessage(ERROR, message))
+		fl.logger.logger.Print(fl.logger.formatMessage(ERROR, "%s", message))
 	}
 }
 
@@ -197,7 +197,7 @@ func (fl *FieldLogger) Error(format string, args ...interface{}) {
 func (fl *FieldLogger) Fatal(format string, args ...interface{}) {
 	if fl.logger.shouldLog(FATAL) {
 		message := fl.formatWithFields(format, args...)
-		fl.logger.logger.Print(fl.logger.formatMessage(FATAL, message))
+		fl.logger.logger.Print(fl.logger.formatMessage(FATAL, "%s", message))
 		os.Exit(1)
 	}
 }
