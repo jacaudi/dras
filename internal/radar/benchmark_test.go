@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-// MockNWS provides a mock implementation for testing
-type MockNWS struct {
-	callCount int
-	mu        sync.Mutex
-}
-
 // BenchmarkGetMode tests performance of VCP to mode conversion
 func BenchmarkGetMode(b *testing.B) {
 	vcps := []string{"R31", "R35", "R12", "R112", "R212", "R215"}
