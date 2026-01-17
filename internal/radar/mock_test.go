@@ -14,6 +14,7 @@ func TestMockDataFetcher(t *testing.T) {
 		}
 		if data == nil {
 			t.Error("Expected data, got nil")
+			return
 		}
 		if data.Name != "KATX" {
 			t.Errorf("Expected Name=KATX, got %s", data.Name)

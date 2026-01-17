@@ -108,6 +108,7 @@ func TestMockNotifier(t *testing.T) {
 		lastNotif = mock.GetLastNotification()
 		if lastNotif == nil {
 			t.Error("Expected last notification, got nil")
+			return
 		}
 
 		if lastNotif.Title != "Last" {
