@@ -1,0 +1,19 @@
+# Uplift configuration for semantic versioning
+# https://uplift.dev/docs/config
+
+# Git configuration
+git:
+  ignoreDetached: false
+
+# Enable annotated tags for releases
+annotatedTags: true
+
+# Changelog configuration
+changelog:
+  sort: asc
+  exclude:
+    - '^chore'
+    - '^ci'
+    - '^docs'
+    - '^style'
+    - '^test'
