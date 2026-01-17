@@ -54,6 +54,17 @@ docker run -d \
 
  See the [kubernetes](examples/kubernetes.yaml) file in [examples](examples) folder — It contains an example deployment, configmap, and secret.
 
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/) with automated releases via [uplift](https://uplift.dev/).
+
+Commits should follow [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` - Minor version bump (new features)
+- `fix:` - Patch version bump (bug fixes)
+- `feat!:` or `BREAKING CHANGE:` - Major version bump
+
+Releases are automatically created when changes are merged to main.
+
 ## How To Contribute
 
 This project welcomes any feature improvements or bugs found via PRs. Thank you!
