@@ -31,3 +31,13 @@ jobs:
       contents: read
       packages: write
     secrets: inherit
+
+  uplift:
+    needs: [docker-build]
+    uses: jacaudi/github-actions/.github/workflows/uplift.yml@main
+    with:
+      dry-run: false
+      fetch-tags: true
+    permissions:
+      contents: write
+    secrets: inherit
