@@ -7,33 +7,34 @@ on:
       - v*
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+  lint:
+    uses: jacaudi/github-actions/.github/workflows/lint.yml@main
+    with:
+      go: true
+    secrets: inherit
 
-      - name: Tests
-        uses: ./.github/actions/tests
+  test:
+    uses: jacaudi/github-actions/.github/workflows/test.yml@main
+    with:
+      framework: go
+      coverage: true
+    secrets: inherit
 
-  release-image:
-    runs-on: ubuntu-latest
-    needs: tests
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Build Tagged Image
-        uses: ./.github/actions/docker
-        with:
-          token: "${{ secrets.GITHUB_TOKEN }}"
-          latest: false
-          push: true
-          tag-strategy: "semver"
+  docker-build:
+    needs: [lint, test]
+    uses: jacaudi/github-actions/.github/workflows/docker-build.yml@main
+    with:
+      registry: ghcr.io
+      platforms: linux/amd64,linux/arm64
+      push: true
+    permissions:
+      contents: read
+      packages: write
+    secrets: inherit
 
   release-binaries:
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [lint, test]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
