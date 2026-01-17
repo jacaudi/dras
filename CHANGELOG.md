@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [2.0.0] - 2025-07-30
 
 ### Added
@@ -67,13 +69,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docker usage unchanged
 - This is a pure internal refactoring with extensive testing improvements
 - While internally restructured, all external APIs and behavior remain unchanged
-
-## [Unreleased]
-
-### Added
-
-### Changed
-
-### Fixed
-
-### Technical Improvements
