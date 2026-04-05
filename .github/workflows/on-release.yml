@@ -7,22 +7,8 @@ on:
       - v*
 
 jobs:
-  lint:
-    uses: jacaudi/github-actions/.github/workflows/lint.yml@main
-    with:
-      go: true
-    secrets: inherit
-
-  test:
-    uses: jacaudi/github-actions/.github/workflows/test.yml@main
-    with:
-      framework: go
-      coverage: true
-    secrets: inherit
-
   docker-build:
-    needs: [lint, test]
-    uses: jacaudi/github-actions/.github/workflows/docker-build.yml@main
+    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.15.3
     with:
       registry: ghcr.io
       platforms: linux/amd64,linux/arm64
@@ -32,14 +18,8 @@ jobs:
       packages: write
     secrets: inherit
 
-  release-binaries:
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Release Binaries
-        uses: ./.github/actions/go-release
-        with:
-          token: "${{ secrets.GITHUB_TOKEN }}"
+  pipeline-summary:
+    if: always()
+    needs: [docker-build]
+    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.15.3
+    secrets: inherit

@@ -10,14 +10,14 @@ on:
 
 jobs:
   lint:
-    uses: jacaudi/github-actions/.github/workflows/lint.yml@main
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.15.3
     with:
       go: true
     secrets: inherit
 
   test:
-    uses: jacaudi/github-actions/.github/workflows/test.yml@main
+    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.15.3
     with:
-      framework: go
+      test-framework: go
       coverage: true
     secrets: inherit
