@@ -32,6 +32,8 @@ jobs:
       validate-config: true
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
     secrets:
       app-id: ${{ secrets.APP_ID }}
       app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
