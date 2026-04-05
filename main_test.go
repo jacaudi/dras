@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -17,28 +16,9 @@ func TestMainIntegration(t *testing.T) {
 	// the integration components that main() uses.
 
 	t.Run("config loading and validation", func(t *testing.T) {
-		// Save original environment
-		origEnv := map[string]string{
-			"STATION_IDS":        os.Getenv("STATION_IDS"),
-			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
-			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
-			"DRYRUN":             os.Getenv("DRYRUN"),
-		}
-
-		// Clean environment
-		defer func() {
-			for key, value := range origEnv {
-				if value == "" {
-					os.Unsetenv(key)
-				} else {
-					os.Setenv(key, value)
-				}
-			}
-		}()
-
 		// Set up test environment for dry run
-		os.Setenv("DRYRUN", "true")
-		os.Setenv("INTERVAL", "1") // 1 minute for testing
+		t.Setenv("DRYRUN", "true")
+		t.Setenv("INTERVAL", "1") // 1 minute for testing
 
 		// Test that config loads successfully
 		cfg, err := config.Load()
@@ -62,26 +42,8 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("service initialization", func(t *testing.T) {
-		// Save original environment
-		origEnv := map[string]string{
-			"DRYRUN":             os.Getenv("DRYRUN"),
-			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
-			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
-		}
-
-		// Clean environment
-		defer func() {
-			for key, value := range origEnv {
-				if value == "" {
-					os.Unsetenv(key)
-				} else {
-					os.Setenv(key, value)
-				}
-			}
-		}()
-
 		t.Run("dry run mode - no notification service", func(t *testing.T) {
-			os.Setenv("DRYRUN", "true")
+			t.Setenv("DRYRUN", "true")
 
 			cfg, err := config.Load()
 			if err != nil {
@@ -112,11 +74,11 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("production mode - with notification service", func(t *testing.T) {
-			os.Setenv("DRYRUN", "false")
-			os.Setenv("PUSHOVER_API_TOKEN", "abcdefghijklmnopqrstuvwxyz1234") // 30 alphanumeric chars
-			os.Setenv("PUSHOVER_USER_KEY", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234")  // 30 alphanumeric chars
-			os.Setenv("STATION_IDS", "KATX")
-			os.Setenv("INTERVAL", "1") // 1 minute for testing
+			t.Setenv("DRYRUN", "false")
+			t.Setenv("PUSHOVER_API_TOKEN", "abcdefghijklmnopqrstuvwxyz1234") // 30 alphanumeric chars
+			t.Setenv("PUSHOVER_USER_KEY", "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234")  // 30 alphanumeric chars
+			t.Setenv("STATION_IDS", "KATX")
+			t.Setenv("INTERVAL", "1") // 1 minute for testing
 
 			cfg, err := config.Load()
 			if err != nil {
@@ -152,32 +114,13 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("error conditions", func(t *testing.T) {
-		// Save original environment
-		origEnv := map[string]string{
-			"DRYRUN":             os.Getenv("DRYRUN"),
-			"STATION_IDS":        os.Getenv("STATION_IDS"),
-			"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
-			"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
-		}
-
-		// Clean environment
-		defer func() {
-			for key, value := range origEnv {
-				if value == "" {
-					os.Unsetenv(key)
-				} else {
-					os.Setenv(key, value)
-				}
-			}
-		}()
-
 		t.Run("missing required config in production mode", func(t *testing.T) {
-			// Clear all environment variables
-			for key := range origEnv {
-				os.Unsetenv(key)
-			}
-			os.Setenv("DRYRUN", "false")
-			os.Setenv("INTERVAL", "1") // 1 minute for testing
+			// Clear any inherited env vars by setting to empty (config uses os.Getenv)
+			t.Setenv("STATION_IDS", "")
+			t.Setenv("PUSHOVER_API_TOKEN", "")
+			t.Setenv("PUSHOVER_USER_KEY", "")
+			t.Setenv("DRYRUN", "false")
+			t.Setenv("INTERVAL", "1") // 1 minute for testing
 
 			cfg, err := config.Load()
 			if err != nil {

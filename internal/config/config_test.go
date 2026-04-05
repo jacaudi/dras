@@ -1,42 +1,38 @@
 package config
 
 import (
-	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/jacaudi/dras/internal/radar"
 )
 
 func TestLoad(t *testing.T) {
-	// Save original environment
-	origEnv := map[string]string{
-		"STATION_IDS":        os.Getenv("STATION_IDS"),
-		"PUSHOVER_API_TOKEN": os.Getenv("PUSHOVER_API_TOKEN"),
-		"PUSHOVER_USER_KEY":  os.Getenv("PUSHOVER_USER_KEY"),
-		"DRYRUN":             os.Getenv("DRYRUN"),
-		"INTERVAL":           os.Getenv("INTERVAL"),
-		"ALERT_VCP":          os.Getenv("ALERT_VCP"),
-		"ALERT_STATUS":       os.Getenv("ALERT_STATUS"),
-		"ALERT_OPERABILITY":  os.Getenv("ALERT_OPERABILITY"),
-		"ALERT_POWER_SOURCE": os.Getenv("ALERT_POWER_SOURCE"),
-		"ALERT_GEN_STATE":    os.Getenv("ALERT_GEN_STATE"),
+	// Keys that may be inherited from CI/dev environment and need explicit clearing.
+	// config.Load() uses os.Getenv() (not os.LookupEnv), so empty string == unset.
+	envKeys := []string{
+		"STATION_IDS",
+		"PUSHOVER_API_TOKEN",
+		"PUSHOVER_USER_KEY",
+		"DRYRUN",
+		"INTERVAL",
+		"ALERT_VCP",
+		"ALERT_STATUS",
+		"ALERT_OPERABILITY",
+		"ALERT_POWER_SOURCE",
+		"ALERT_GEN_STATE",
 	}
 
-	// Clean environment
-	defer func() {
-		for key, value := range origEnv {
-			if value == "" {
-				os.Unsetenv(key)
-			} else {
-				os.Setenv(key, value)
-			}
+	clearEnv := func(t *testing.T) {
+		t.Helper()
+		for _, key := range envKeys {
+			t.Setenv(key, "")
 		}
-	}()
+	}
 
 	t.Run("loads default configuration", func(t *testing.T) {
-		// Clear all env vars
-		for key := range origEnv {
-			os.Unsetenv(key)
-		}
+		clearEnv(t)
 
 		cfg, err := Load()
 		if err != nil {
@@ -55,13 +51,14 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("loads custom configuration", func(t *testing.T) {
-		os.Setenv("STATION_IDS", "KATX,KRAX")
-		os.Setenv("PUSHOVER_API_TOKEN", "test-token")
-		os.Setenv("PUSHOVER_USER_KEY", "test-key")
-		os.Setenv("DRYRUN", "true")
-		os.Setenv("INTERVAL", "5")
-		os.Setenv("ALERT_VCP", "false")
-		os.Setenv("ALERT_STATUS", "true")
+		clearEnv(t)
+		t.Setenv("STATION_IDS", "KATX,KRAX")
+		t.Setenv("PUSHOVER_API_TOKEN", "test-token")
+		t.Setenv("PUSHOVER_USER_KEY", "test-key")
+		t.Setenv("DRYRUN", "true")
+		t.Setenv("INTERVAL", "5")
+		t.Setenv("ALERT_VCP", "false")
+		t.Setenv("ALERT_STATUS", "true")
 
 		cfg, err := Load()
 		if err != nil {
@@ -86,7 +83,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("handles invalid DRYRUN value", func(t *testing.T) {
-		os.Setenv("DRYRUN", "invalid")
+		clearEnv(t)
+		t.Setenv("DRYRUN", "invalid")
 
 		_, err := Load()
 		if err == nil {
@@ -95,7 +93,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("handles invalid INTERVAL value", func(t *testing.T) {
-		os.Setenv("INTERVAL", "invalid")
+		clearEnv(t)
+		t.Setenv("INTERVAL", "invalid")
 
 		_, err := Load()
 		if err == nil {
@@ -135,6 +134,99 @@ func TestConfig_Validate(t *testing.T) {
 		}
 		if err := cfg.Validate(); err == nil {
 			t.Error("Validation should fail when missing required fields")
+		}
+	})
+}
+
+func TestMaskString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		show     int
+		expected string
+	}{
+		{"empty string", "", 6, ""},
+		{"shorter than show", "abc", 6, "***"},
+		{"equal to show", "abcdef", 6, "******"},
+		{"longer than show", "abcdefghij", 6, "abcdef****"},
+		{"show zero", "secret", 0, "******"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := maskString(tc.input, tc.show)
+			if got != tc.expected {
+				t.Errorf("maskString(%q, %d) = %q, want %q", tc.input, tc.show, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestConfig_String(t *testing.T) {
+	t.Run("dry run mode", func(t *testing.T) {
+		cfg := &Config{
+			DryRun:        true,
+			CheckInterval: 10 * time.Minute,
+			LogLevel:      "INFO",
+			AlertConfig:   radar.AlertConfig{VCP: true},
+		}
+		out := cfg.String()
+
+		if !strings.Contains(out, "Dry Run: true") {
+			t.Error("expected 'Dry Run: true' in output")
+		}
+		if !strings.Contains(out, "Pushover: disabled (dry run)") {
+			t.Error("expected dry-run pushover notice")
+		}
+		if !strings.Contains(out, "KATX,KRAX (test mode)") {
+			t.Error("expected test-mode station IDs")
+		}
+		if !strings.Contains(out, "Alert Types: VCP") {
+			t.Error("expected VCP in alert types")
+		}
+	})
+
+	t.Run("production mode masks credentials", func(t *testing.T) {
+		cfg := &Config{
+			DryRun:           false,
+			StationInput:     "KATX",
+			PushoverAPIToken: "abcdefghijklmnop",
+			PushoverUserKey:  "ABCDEFGHIJKLMNOP",
+			CheckInterval:    5 * time.Minute,
+			LogLevel:         "DEBUG",
+			AlertConfig: radar.AlertConfig{
+				VCP:         true,
+				Status:      true,
+				Operability: true,
+				PowerSource: true,
+				GenState:    true,
+			},
+		}
+		out := cfg.String()
+
+		if !strings.Contains(out, "Station IDs: KATX") {
+			t.Error("expected station IDs in output")
+		}
+		if strings.Contains(out, "abcdefghijklmnop") {
+			t.Error("full API token should not appear in output")
+		}
+		if !strings.Contains(out, "abcdef**********") {
+			t.Errorf("expected masked API token, got: %s", out)
+		}
+		if !strings.Contains(out, "VCP, Status, Operability, PowerSource, GenState") {
+			t.Errorf("expected all alert types in output, got: %s", out)
+		}
+	})
+
+	t.Run("no alert types", func(t *testing.T) {
+		cfg := &Config{
+			DryRun:      true,
+			AlertConfig: radar.AlertConfig{},
+		}
+		out := cfg.String()
+
+		if !strings.Contains(out, "Alert Types: none") {
+			t.Error("expected 'Alert Types: none' when no alerts enabled")
 		}
 	})
 }
