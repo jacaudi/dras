@@ -187,6 +187,53 @@ func TestLogger_Fatal(t *testing.T) {
 	}
 }
 
+func TestFieldLogger_AllLevels(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewWithOutput(DEBUG, &buf)
+	fieldLogger := logger.WithField("station", "KATX")
+
+	fieldLogger.Debug("debug msg")
+	fieldLogger.Warn("warn msg")
+	fieldLogger.Error("error msg")
+
+	output := buf.String()
+	for _, want := range []string{"debug msg", "warn msg", "error msg", "station=KATX"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("expected output to contain %q, got: %s", want, output)
+		}
+	}
+}
+
+func TestFieldLogger_Fatal(t *testing.T) {
+	// Fatal calls os.Exit -- set level above FATAL so it's filtered out and doesn't exit.
+	var buf bytes.Buffer
+	logger := NewWithOutput(FATAL+1, &buf)
+	fieldLogger := logger.WithField("key", "value")
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Fatal with filtered level should not panic: %v", r)
+		}
+	}()
+
+	fieldLogger.Fatal("should not exit")
+
+	if buf.Len() > 0 {
+		t.Error("Fatal should not log when level is too high")
+	}
+}
+
+func TestSetDefaultLevel(t *testing.T) {
+	// Save and restore default level
+	original := defaultLogger.level
+	t.Cleanup(func() { defaultLogger.SetLevel(original) })
+
+	SetDefaultLevel(ERROR)
+	if defaultLogger.level != ERROR {
+		t.Errorf("expected default level ERROR, got %v", defaultLogger.level)
+	}
+}
+
 func TestLogger_LevelFiltering(t *testing.T) {
 	testCases := []struct {
 		loggerLevel  Level
