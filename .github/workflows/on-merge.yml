@@ -12,13 +12,13 @@ concurrency:
 
 jobs:
   lint:
-    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.15.4
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.16.1
     with:
       go: true
     secrets: inherit
 
   test:
-    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.15.4
+    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.16.1
     with:
       test-framework: go
       coverage: true
@@ -35,7 +35,7 @@ jobs:
 
   release:
     needs: [approve]
-    uses: jacaudi/github-actions/.github/workflows/component-semantic-release.yml@v0.15.4
+    uses: jacaudi/github-actions/.github/workflows/component-semantic-release.yml@v0.16.1
     with:
       use-github-app: true
       allow-initial-development-versions: true
@@ -54,5 +54,5 @@ jobs:
   pipeline-summary:
     if: always()
     needs: [lint, test, approve, release]
-    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.15.4
+    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.16.1
     secrets: inherit
