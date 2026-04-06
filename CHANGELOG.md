@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.1](https://github.com/jacaudi/dras/compare/v2.2.0...v2.2.1) (2026-04-06)
+
+### Bug Fixes
+
+* **ci:** preserve v prefix in container image tags ([6a47d28](https://github.com/jacaudi/dras/commit/6a47d287208b35301a3f0a655327669595755513))
+
 ## [2.2.0](https://github.com/jacaudi/dras/compare/v2.1.1...v2.2.0) (2026-04-06)
 
 * feat!: migrate from go-semantic-release to JS semantic-release ([1d4b6b7](https://github.com/jacaudi/dras/commit/1d4b6b7fea8bb208988f84d8e0023331fbcdef4b))
