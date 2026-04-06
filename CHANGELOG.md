@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/jacaudi/dras/compare/v2.1.1...v2.2.0) (2026-04-06)
+
+* feat!: migrate from go-semantic-release to JS semantic-release ([1d4b6b7](https://github.com/jacaudi/dras/commit/1d4b6b7fea8bb208988f84d8e0023331fbcdef4b))
+
+
+### BREAKING CHANGES
+
+* Release tooling switched from go-semantic-release to JS
+semantic-release. The .semrelrc config is replaced by .releaserc.json.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
