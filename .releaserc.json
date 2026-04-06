@@ -17,7 +17,7 @@
       "changelogTitle": "# Changelog"
     }],
     ["@semantic-release/exec", {
-      "publishCmd": "goreleaser release --clean"
+      "publishCmd": "goreleaser release --clean --skip=validate"
     }],
     ["@semantic-release/git", {
       "assets": ["CHANGELOG.md"],
