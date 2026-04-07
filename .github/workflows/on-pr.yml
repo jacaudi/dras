@@ -10,13 +10,13 @@ on:
 
 jobs:
   lint:
-    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.17.0
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.0
     with:
       go: true
     secrets: inherit
 
   test:
-    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.17.0
+    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.20.0
     with:
       test-framework: go
       coverage: true

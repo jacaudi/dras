@@ -8,7 +8,7 @@ on:
 
 jobs:
   docker-build:
-    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.17.0
+    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.0
     with:
       registry: ghcr.io
       platforms: linux/amd64,linux/arm64
@@ -25,5 +25,5 @@ jobs:
   pipeline-summary:
     if: always()
     needs: [docker-build]
-    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.17.0
+    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.20.0
     secrets: inherit
