@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.3](https://github.com/jacaudi/dras/compare/v2.2.2...v2.2.3) (2026-04-07)
+
+### Bug Fixes
+
+* **ci:** prevent duplicate GitHub Release from goreleaser ([4b2f7ac](https://github.com/jacaudi/dras/commit/4b2f7acf0deec8ec61c1966d9878211315e97a6c))
+
 ## [2.2.2](https://github.com/jacaudi/dras/compare/v2.2.1...v2.2.2) (2026-04-07)
 
 ### Bug Fixes
