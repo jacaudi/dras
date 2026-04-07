@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.4](https://github.com/jacaudi/dras/compare/v2.2.3...v2.2.4) (2026-04-07)
+
+### Bug Fixes
+
+* **ci:** remove invalid template variable from github assets config ([687d770](https://github.com/jacaudi/dras/commit/687d7701182e3932093125beb3cc5cf8f597399f))
+
 ## [2.2.3](https://github.com/jacaudi/dras/compare/v2.2.2...v2.2.3) (2026-04-07)
 
 ### Bug Fixes
