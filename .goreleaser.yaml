@@ -14,5 +14,7 @@ archives:
   - name_template: "{{.ProjectName}}_{{.Version}}_{{.Os}}_{{.Arch}}"
 checksum:
   name_template: "checksums.txt"
+release:
+  disable: true
 changelog:
-  sort: asc
+  disable: true

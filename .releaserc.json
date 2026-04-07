@@ -23,6 +23,11 @@
       "assets": ["CHANGELOG.md"],
       "message": "release: v${nextRelease.version} [skip ci]"
     }],
-    "@semantic-release/github"
+    ["@semantic-release/github", {
+      "assets": [
+        {"path": "dist/*.tar.gz", "label": "Binary (${name})"},
+        {"path": "dist/checksums.txt", "label": "Checksums"}
+      ]
+    }]
   ]
 }
