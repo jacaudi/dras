@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.2](https://github.com/jacaudi/dras/compare/v2.2.1...v2.2.2) (2026-04-07)
+
+### Bug Fixes
+
+* **ci:** skip goreleaser dirty check during semantic-release ([83d6c7a](https://github.com/jacaudi/dras/commit/83d6c7a5f1f4272659455b5b15d140607794924f))
+
 ## [2.2.1](https://github.com/jacaudi/dras/compare/v2.2.0...v2.2.1) (2026-04-06)
 
 ### Bug Fixes
