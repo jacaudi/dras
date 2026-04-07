@@ -25,8 +25,8 @@
     }],
     ["@semantic-release/github", {
       "assets": [
-        {"path": "dist/*.tar.gz", "label": "Binary (${name})"},
-        {"path": "dist/checksums.txt", "label": "Checksums"}
+        {"path": "dist/*.tar.gz"},
+        {"path": "dist/checksums.txt"}
       ]
     }]
   ]
