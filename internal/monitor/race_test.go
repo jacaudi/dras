@@ -33,7 +33,7 @@ func TestRaceConditions(t *testing.T) {
 	t.Run("concurrent map access race detection", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
 		var wg sync.WaitGroup
@@ -83,7 +83,7 @@ func TestRaceConditions(t *testing.T) {
 	t.Run("concurrent read/write race detection", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		// Initialize some data
 		monitor.mu.Lock()
@@ -151,7 +151,7 @@ func TestRaceConditions(t *testing.T) {
 	t.Run("stress test with high concurrency", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC", "KJAX", "KMLB", "KTBW", "KMHX", "KAKQ"}
 		var wg sync.WaitGroup
@@ -204,7 +204,7 @@ func TestRaceWithRealMonitoring(t *testing.T) {
 
 	radarService := radar.New()
 	var notifyService *notify.Service
-	monitor := New(radarService, notifyService, cfg)
+	monitor := New(radarService, notifyService, nil, cfg)
 
 	// Start the monitor in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)

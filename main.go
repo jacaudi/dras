@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jacaudi/dras/internal/config"
+	"github.com/jacaudi/dras/internal/image"
 	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/monitor"
 	"github.com/jacaudi/dras/internal/notify"
@@ -47,9 +48,10 @@ func main() {
 	}).Debug("Runtime configuration")
 
 	// Set NWS UserAgent
-	logger.Info("Setting NWS UserAgent to https://github.com/jacaudi/dras")
+	userAgent := fmt.Sprintf("dras/%s (+https://github.com/jacaudi/dras)", versionInfo.Version)
+	logger.Info("Setting NWS UserAgent to %s", userAgent)
 	nwsConfig := nws.Config{}
-	nwsConfig.SetUserAgent("dras/1.0 (+https://github.com/jacaudi/dras)")
+	nwsConfig.SetUserAgent(userAgent)
 
 	// Initialize services
 	radarService := radar.New()
@@ -67,8 +69,24 @@ func main() {
 		logger.Info("Running in dry-run mode, notifications disabled")
 	}
 
+	// Initialize image service for polling and attaching radar images on VCP changes
+	var imageService *image.Service
+	if cfg.RadarImageEnabled {
+		imageService = image.New(image.Config{
+			URLTemplate: cfg.RadarImageURLTmpl,
+			Retention:   cfg.RadarImageRetention,
+			UserAgent:   userAgent,
+		})
+		logger.WithFields(map[string]string{
+			"url_template": imageService.URLFor("{station}"),
+			"retention":    cfg.RadarImageRetention.String(),
+		}).Info("Radar image polling enabled")
+	} else {
+		logger.Info("Radar image polling disabled")
+	}
+
 	// Initialize monitor
-	monitorService := monitor.New(radarService, notifyService, cfg)
+	monitorService := monitor.New(radarService, notifyService, imageService, cfg)
 
 	// Start monitoring
 	logger.Info("Starting radar monitoring service")

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jacaudi/dras/internal/config"
+	"github.com/jacaudi/dras/internal/image"
 	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
@@ -14,18 +15,22 @@ import (
 
 // Monitor handles the monitoring logic for radar stations.
 type Monitor struct {
-	radarService  *radar.Service
-	notifyService *notify.Service
+	radarService  radar.DataFetcher
+	notifyService notify.Notifier
+	imageService  *image.Service
 	config        *config.Config
 	radarDataMap  map[string]map[string]interface{}
 	mu            sync.Mutex
 }
 
-// New creates a new monitor instance.
-func New(radarService *radar.Service, notifyService *notify.Service, cfg *config.Config) *Monitor {
+// New creates a new monitor instance. imageService may be nil to disable
+// fetching and attaching radar images. notifyService may also be nil when
+// running in dry-run mode.
+func New(radarService radar.DataFetcher, notifyService notify.Notifier, imageService *image.Service, cfg *config.Config) *Monitor {
 	return &Monitor{
 		radarService:  radarService,
 		notifyService: notifyService,
+		imageService:  imageService,
 		config:        cfg,
 		radarDataMap:  make(map[string]map[string]interface{}),
 	}
@@ -100,6 +105,11 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 		return fmt.Errorf("error determining radar mode for station %s: %w", stationID, err)
 	}
 
+	// Poll and store the latest radar image so it can be attached to the
+	// next change notification. Image fetch failures are logged but do not
+	// fail the whole poll.
+	radarImage := m.fetchRadarImage(stationID, stationLogger)
+
 	// Check if we need to initialize or if this is first run
 	m.mu.Lock()
 	if _, exists := m.radarDataMap[stationID]; !exists {
@@ -144,10 +154,14 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 			"change":       changeMessage,
 		}).Info("Radar data changed")
 
+		vcpChanged := lastData.VCP != newRadarData.VCP
+
 		if m.config.DryRun {
 			stationLogger.Debug("Would send change notification: %s", changeMessage)
 		} else {
-			if err := m.notifyService.SendNotification(ctx, fmt.Sprintf("%s Update", stationID), changeMessage); err != nil {
+			title := fmt.Sprintf("%s Update", stationID)
+			attachment := m.attachmentForChange(stationID, vcpChanged, radarImage, stationLogger)
+			if err := m.notifyService.SendNotificationWithAttachment(ctx, title, changeMessage, attachment); err != nil {
 				return fmt.Errorf("failed to send change notification for station %s: %w", stationID, err)
 			}
 			stationLogger.Info("Change notification sent successfully")
@@ -160,4 +174,47 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	}
 
 	return nil
+}
+
+// fetchRadarImage downloads and caches the latest radar image for the given
+// station. Returns nil if image fetching is disabled or the download fails.
+func (m *Monitor) fetchRadarImage(stationID string, stationLogger *logger.FieldLogger) *image.Image {
+	if m.imageService == nil {
+		return nil
+	}
+
+	img, err := m.imageService.Fetch(stationID)
+	if err != nil {
+		stationLogger.Warn("Failed to fetch radar image: %v", err)
+		return nil
+	}
+	return img
+}
+
+// attachmentForChange returns the radar image to attach to a change
+// notification, or nil when no attachment should be sent. Images are only
+// attached when the VCP changed, matching the user-facing feature scope.
+func (m *Monitor) attachmentForChange(stationID string, vcpChanged bool, justFetched *image.Image, stationLogger *logger.FieldLogger) *notify.Attachment {
+	if !vcpChanged || m.imageService == nil {
+		return nil
+	}
+
+	img := justFetched
+	if img == nil {
+		// Fall back to the most recently cached image if the latest poll
+		// failed to download a fresh one.
+		if cached, ok := m.imageService.Latest(stationID); ok {
+			img = cached
+		}
+	}
+	if img == nil {
+		stationLogger.Debug("VCP changed but no radar image available to attach")
+		return nil
+	}
+
+	return &notify.Attachment{
+		Data:        img.Data,
+		ContentType: img.ContentType,
+		Filename:    img.Filename,
+	}
 }

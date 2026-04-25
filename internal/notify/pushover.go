@@ -1,15 +1,24 @@
 package notify
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"regexp"
 
+	"github.com/gregdel/pushover"
 	"github.com/jacaudi/dras/internal/logger"
 	"github.com/nikoksr/notify"
-	"github.com/nikoksr/notify/service/pushover"
+	pushoverNotify "github.com/nikoksr/notify/service/pushover"
 )
+
+// Attachment is an optional image to include with a Pushover notification.
+type Attachment struct {
+	Data        []byte
+	ContentType string
+	Filename    string
+}
 
 // Service handles notification operations and implements the Notifier interface.
 type Service struct {
@@ -91,7 +100,7 @@ func ValidateUserKey(userKey string) error {
 // The function returns an error if the notification fails to send, otherwise it returns nil.
 func (s *Service) SendNotification(ctx context.Context, title, message string) error {
 	// Create a new Pushover service
-	pushoverService := pushover.New(s.apiToken)
+	pushoverService := pushoverNotify.New(s.apiToken)
 
 	// Add a recipient
 	pushoverService.AddReceivers(s.userKey)
@@ -107,5 +116,44 @@ func (s *Service) SendNotification(ctx context.Context, title, message string) e
 	}
 
 	logger.Debug("Pushover notification sent successfully")
+	return nil
+}
+
+// SendNotificationWithAttachment sends a Pushover notification that includes
+// an image attachment. When attachment is nil this is equivalent to
+// SendNotification. The Pushover REST API is invoked directly because the
+// nikoksr/notify wrapper does not expose attachment support.
+func (s *Service) SendNotificationWithAttachment(ctx context.Context, title, message string, attachment *Attachment) error {
+	if attachment == nil || len(attachment.Data) == 0 {
+		return s.SendNotification(ctx, title, message)
+	}
+
+	app := pushover.New(s.apiToken)
+	recipient := pushover.NewRecipient(s.userKey)
+
+	msg := pushover.NewMessageWithTitle(message, title)
+	if err := msg.AddAttachment(bytes.NewReader(attachment.Data)); err != nil {
+		return fmt.Errorf("failed to attach image to notification: %w", err)
+	}
+
+	type result struct {
+		err error
+	}
+	resCh := make(chan result, 1)
+	go func() {
+		_, err := app.SendMessage(msg, recipient)
+		resCh <- result{err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case r := <-resCh:
+		if r.err != nil {
+			return r.err
+		}
+	}
+
+	logger.WithField("bytes", fmt.Sprintf("%d", len(attachment.Data))).Debug("Pushover notification with attachment sent successfully")
 	return nil
 }

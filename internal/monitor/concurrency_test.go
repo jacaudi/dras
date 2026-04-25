@@ -23,7 +23,7 @@ func TestConcurrentStationProcessing(t *testing.T) {
 	t.Run("concurrent data access", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
 		var wg sync.WaitGroup
@@ -64,7 +64,7 @@ func TestConcurrentStationProcessing(t *testing.T) {
 	t.Run("concurrent read/write operations", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		// Pre-populate the data map
 		monitor.mu.Lock()
@@ -160,7 +160,7 @@ func TestGoroutineErrorHandling(t *testing.T) {
 		// In our current implementation, goroutines return errors instead of panicking
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		var wg sync.WaitGroup
 		errorCount := 0
@@ -209,7 +209,7 @@ func TestMonitorStartStop(t *testing.T) {
 	t.Run("start and cancel", func(t *testing.T) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		ctx, cancel := context.WithCancel(context.Background())
 

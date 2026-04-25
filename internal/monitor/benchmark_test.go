@@ -29,14 +29,14 @@ func BenchmarkMonitorMemoryUsage(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			radarService := radar.New()
 			var notifyService *notify.Service // nil for dry run
-			_ = New(radarService, notifyService, cfg)
+			_ = New(radarService, notifyService, nil, cfg)
 		}
 	})
 
 	b.Run("DataMapGrowth", func(b *testing.B) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
 
@@ -74,7 +74,7 @@ func BenchmarkConcurrentProcessing(b *testing.B) {
 	b.Run("SingleStation", func(b *testing.B) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -97,7 +97,7 @@ func BenchmarkConcurrentProcessing(b *testing.B) {
 	b.Run("MultipleStations", func(b *testing.B) {
 		radarService := radar.New()
 		var notifyService *notify.Service
-		monitor := New(radarService, notifyService, cfg)
+		monitor := New(radarService, notifyService, nil, cfg)
 
 		stations := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
 

@@ -67,7 +67,7 @@ func TestMainIntegration(t *testing.T) {
 			}
 
 			// Initialize monitor
-			monitorService := monitor.New(radarService, notifyService, cfg)
+			monitorService := monitor.New(radarService, notifyService, nil, cfg)
 			if monitorService == nil {
 				t.Error("Expected monitor service to be initialized")
 			}
@@ -106,7 +106,7 @@ func TestMainIntegration(t *testing.T) {
 			}
 
 			// Initialize monitor
-			monitorService := monitor.New(radarService, notifyService, cfg)
+			monitorService := monitor.New(radarService, notifyService, nil, cfg)
 			if monitorService == nil {
 				t.Error("Expected monitor service to be initialized")
 			}

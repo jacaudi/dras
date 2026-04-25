@@ -17,13 +17,16 @@ import (
 
 // Config holds all configuration for the DRAS application.
 type Config struct {
-	StationInput     string
-	PushoverAPIToken string
-	PushoverUserKey  string
-	DryRun           bool
-	CheckInterval    time.Duration
-	LogLevel         string
-	AlertConfig      radar.AlertConfig
+	StationInput        string
+	PushoverAPIToken    string
+	PushoverUserKey     string
+	DryRun              bool
+	CheckInterval       time.Duration
+	LogLevel            string
+	AlertConfig         radar.AlertConfig
+	RadarImageEnabled   bool
+	RadarImageURLTmpl   string
+	RadarImageRetention time.Duration
 }
 
 // Load loads configuration from environment variables with proper error handling.
@@ -85,6 +88,23 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	cfg.RadarImageEnabled, err = parseBoolEnv("RADAR_IMAGE_ENABLED", "true")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.RadarImageURLTmpl = os.Getenv("RADAR_IMAGE_URL_TEMPLATE")
+
+	retentionStr := os.Getenv("RADAR_IMAGE_RETENTION")
+	if retentionStr == "" {
+		cfg.RadarImageRetention = time.Hour
+	} else {
+		cfg.RadarImageRetention, err = time.ParseDuration(retentionStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid RADAR_IMAGE_RETENTION value '%s': %w", retentionStr, err)
+		}
+	}
+
 	return cfg, nil
 }
 
@@ -123,6 +143,10 @@ func (c *Config) Validate() error {
 		if err := validateLogLevel(c.LogLevel); err != nil {
 			errors = append(errors, fmt.Sprintf("LOG_LEVEL validation failed: %v", err))
 		}
+	}
+
+	if c.RadarImageEnabled && c.RadarImageRetention <= 0 {
+		errors = append(errors, "RADAR_IMAGE_RETENTION must be positive (e.g. 1h, 30m)")
 	}
 
 	if len(errors) > 0 {
