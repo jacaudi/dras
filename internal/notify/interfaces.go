@@ -8,6 +8,7 @@ import (
 // Notifier interface for abstracting notification sending
 type Notifier interface {
 	SendNotification(ctx context.Context, title, message string) error
+	SendNotificationWithAttachment(ctx context.Context, title, message string, attachment *Attachment) error
 }
 
 // MockNotifier provides a mock implementation for testing
@@ -20,8 +21,9 @@ type MockNotifier struct {
 
 // Notification represents a sent notification for testing
 type Notification struct {
-	Title   string
-	Message string
+	Title      string
+	Message    string
+	Attachment *Attachment
 }
 
 // NewMockNotifier creates a new mock notifier
@@ -34,6 +36,13 @@ func NewMockNotifier() *MockNotifier {
 
 // SendNotification simulates sending a notification
 func (m *MockNotifier) SendNotification(ctx context.Context, title, message string) error {
+	return m.SendNotificationWithAttachment(ctx, title, message, nil)
+}
+
+// SendNotificationWithAttachment simulates sending a notification that may
+// include an image attachment. The attachment pointer is recorded as-is so
+// tests can assert on it.
+func (m *MockNotifier) SendNotificationWithAttachment(ctx context.Context, title, message string, attachment *Attachment) error {
 	m.callCount++
 
 	if m.shouldError {
@@ -45,8 +54,9 @@ func (m *MockNotifier) SendNotification(ctx context.Context, title, message stri
 	}
 
 	m.notifications = append(m.notifications, Notification{
-		Title:   title,
-		Message: message,
+		Title:      title,
+		Message:    message,
+		Attachment: attachment,
 	})
 
 	return nil

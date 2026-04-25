@@ -22,6 +22,9 @@ func TestLoad(t *testing.T) {
 		"ALERT_OPERABILITY",
 		"ALERT_POWER_SOURCE",
 		"ALERT_GEN_STATE",
+		"RADAR_IMAGE_ENABLED",
+		"RADAR_IMAGE_URL_TEMPLATE",
+		"RADAR_IMAGE_RETENTION",
 	}
 
 	clearEnv := func(t *testing.T) {
@@ -47,6 +50,58 @@ func TestLoad(t *testing.T) {
 		}
 		if cfg.AlertConfig.Status {
 			t.Errorf("Expected Status alerts to be false by default")
+		}
+		if !cfg.RadarImageEnabled {
+			t.Errorf("Expected RadarImageEnabled to be true by default")
+		}
+		if cfg.RadarImageURLTmpl != "" {
+			t.Errorf("Expected RadarImageURLTmpl to default to empty (template applied at New), got %q", cfg.RadarImageURLTmpl)
+		}
+		if cfg.RadarImageRetention != time.Hour {
+			t.Errorf("Expected RadarImageRetention to default to 1h, got %v", cfg.RadarImageRetention)
+		}
+	})
+
+	t.Run("loads custom radar image configuration", func(t *testing.T) {
+		clearEnv(t)
+		t.Setenv("DRYRUN", "true")
+		t.Setenv("RADAR_IMAGE_ENABLED", "false")
+		t.Setenv("RADAR_IMAGE_URL_TEMPLATE", "https://example.com/{station}.png")
+		t.Setenv("RADAR_IMAGE_RETENTION", "30m")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() failed: %v", err)
+		}
+
+		if cfg.RadarImageEnabled {
+			t.Errorf("Expected RadarImageEnabled=false")
+		}
+		if cfg.RadarImageURLTmpl != "https://example.com/{station}.png" {
+			t.Errorf("Expected custom URL template, got %q", cfg.RadarImageURLTmpl)
+		}
+		if cfg.RadarImageRetention != 30*time.Minute {
+			t.Errorf("Expected RadarImageRetention=30m, got %v", cfg.RadarImageRetention)
+		}
+	})
+
+	t.Run("handles invalid RADAR_IMAGE_RETENTION value", func(t *testing.T) {
+		clearEnv(t)
+		t.Setenv("RADAR_IMAGE_RETENTION", "not-a-duration")
+
+		_, err := Load()
+		if err == nil {
+			t.Error("Expected error for invalid RADAR_IMAGE_RETENTION value")
+		}
+	})
+
+	t.Run("handles invalid RADAR_IMAGE_ENABLED value", func(t *testing.T) {
+		clearEnv(t)
+		t.Setenv("RADAR_IMAGE_ENABLED", "maybe")
+
+		_, err := Load()
+		if err == nil {
+			t.Error("Expected error for invalid RADAR_IMAGE_ENABLED value")
 		}
 	})
 
@@ -134,6 +189,34 @@ func TestConfig_Validate(t *testing.T) {
 		}
 		if err := cfg.Validate(); err == nil {
 			t.Error("Validation should fail when missing required fields")
+		}
+	})
+
+	t.Run("fails when image enabled with non-positive retention", func(t *testing.T) {
+		cfg := &Config{
+			DryRun:              true,
+			CheckInterval:       5 * time.Minute,
+			RadarImageEnabled:   true,
+			RadarImageRetention: 0,
+		}
+		err := cfg.Validate()
+		if err == nil {
+			t.Fatal("Validation should fail when retention is 0 with image polling enabled")
+		}
+		if !strings.Contains(err.Error(), "RADAR_IMAGE_RETENTION") {
+			t.Errorf("error %q should mention RADAR_IMAGE_RETENTION", err)
+		}
+	})
+
+	t.Run("passes when image disabled regardless of retention", func(t *testing.T) {
+		cfg := &Config{
+			DryRun:              true,
+			CheckInterval:       5 * time.Minute,
+			RadarImageEnabled:   false,
+			RadarImageRetention: 0,
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("Validation should pass when image polling is disabled, got %v", err)
 		}
 	})
 }

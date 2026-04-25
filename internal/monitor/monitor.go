@@ -15,8 +15,8 @@ import (
 
 // Monitor handles the monitoring logic for radar stations.
 type Monitor struct {
-	radarService  *radar.Service
-	notifyService *notify.Service
+	radarService  radar.DataFetcher
+	notifyService notify.Notifier
 	imageService  *image.Service
 	config        *config.Config
 	radarDataMap  map[string]map[string]interface{}
@@ -24,8 +24,9 @@ type Monitor struct {
 }
 
 // New creates a new monitor instance. imageService may be nil to disable
-// fetching and attaching radar images.
-func New(radarService *radar.Service, notifyService *notify.Service, imageService *image.Service, cfg *config.Config) *Monitor {
+// fetching and attaching radar images. notifyService may also be nil when
+// running in dry-run mode.
+func New(radarService radar.DataFetcher, notifyService notify.Notifier, imageService *image.Service, cfg *config.Config) *Monitor {
 	return &Monitor{
 		radarService:  radarService,
 		notifyService: notifyService,
