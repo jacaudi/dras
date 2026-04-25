@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/jacaudi/dras/compare/v2.2.4...v2.3.0) (2026-04-25)
+
+### Features
+
+* **image:** retain hourly history, send User-Agent on image fetches ([b818292](https://github.com/jacaudi/dras/commit/b818292eda28cbe67871131079dcb5d92b2d911a))
+* poll radar image and attach to VCP-change notifications ([b805392](https://github.com/jacaudi/dras/commit/b805392d32651a575cb82c62da8740eb443cd676))
+
 ## [2.2.4](https://github.com/jacaudi/dras/compare/v2.2.3...v2.2.4) (2026-04-07)
 
 ### Bug Fixes
