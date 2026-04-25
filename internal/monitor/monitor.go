@@ -202,7 +202,7 @@ func (m *Monitor) attachmentForChange(stationID string, vcpChanged bool, justFet
 	if img == nil {
 		// Fall back to the most recently cached image if the latest poll
 		// failed to download a fresh one.
-		if cached, ok := m.imageService.Get(stationID); ok {
+		if cached, ok := m.imageService.Latest(stationID); ok {
 			img = cached
 		}
 	}

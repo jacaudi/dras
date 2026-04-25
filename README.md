@@ -13,8 +13,11 @@
 - Power Source
 - Generator State
 
-When a VCP change is detected, the latest radar image (downloaded at the same poll
-that detected the change) is attached to the Pushover notification.
+Each poll downloads the latest radar image and keeps a sliding window of the last
+hour of images per station (configurable via `RADAR_IMAGE_RETENTION`). When a VCP
+change is detected, the freshly downloaded image is attached to the Pushover
+notification. All radar image requests use the same User-Agent as the NWS API
+calls.
 
 ## How To Use
 
@@ -37,7 +40,8 @@ that detected the change) is attached to the Pushover notification.
     - `ALERT_POWER_SOURCE` — Enable Alerts on changes to radar power source (default: `false`)
     - `ALERT_GEN_STATE` — Enable Alerts on changes to generator state (default: `false`)
     - `RADAR_IMAGE_ENABLED` — Poll the radar image every check and attach it to VCP-change notifications (default: `true`)
-    - `RADAR_IMAGE_URL_TEMPLATE` — Override the radar image URL. Use `{station}` as the station-ID placeholder (default: NWS Ridge GIF)
+    - `RADAR_IMAGE_URL_TEMPLATE` — Override the radar image URL. Use `{station}` as the station-ID placeholder (default: NWS Ridge GIF — the highest-resolution per-station single image NWS publishes via static URL)
+    - `RADAR_IMAGE_RETENTION` — Sliding window of polled images kept per station, parsed as a Go duration like `1h` or `30m` (default: `1h`)
  4. Enjoy!
 
 ### Standalone Container Method

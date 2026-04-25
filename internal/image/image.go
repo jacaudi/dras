@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,7 +17,12 @@ import (
 
 // DefaultURLTemplate is the default NWS radar image URL pattern. The
 // "{station}" placeholder is replaced with the station ID at fetch time.
+// This is the highest-resolution single-image per-station product NWS
+// publishes via a static URL (600x550 GIF).
 const DefaultURLTemplate = "https://radar.weather.gov/ridge/standard/{station}_0.gif"
+
+// DefaultRetention is the default sliding-window length for cached images.
+const DefaultRetention = time.Hour
 
 // stationPlaceholder is the token replaced with the station ID inside a URL
 // template.
@@ -36,27 +42,64 @@ type Image struct {
 	FetchedAt   time.Time
 }
 
-// Service downloads radar images and caches the most recent image for each
-// station so it can be attached when a change notification fires.
+// Config configures an image Service.
+type Config struct {
+	// URLTemplate is the radar image URL with "{station}" as the station-ID
+	// placeholder. Empty defaults to DefaultURLTemplate.
+	URLTemplate string
+	// Retention controls how long fetched images are kept in the per-station
+	// history. Zero or negative defaults to DefaultRetention.
+	Retention time.Duration
+	// UserAgent is sent on every image request. Empty means no override.
+	UserAgent string
+	// HTTPClient is the client used for fetching images. nil installs a
+	// client with a sensible timeout.
+	HTTPClient *http.Client
+}
+
+// Service downloads radar images and caches the most recent images for each
+// station so they can be attached when a change notification fires. The cache
+// is a sliding window keyed by FetchedAt.
 type Service struct {
 	httpClient  *http.Client
 	urlTemplate string
+	userAgent   string
+	retention   time.Duration
 
-	mu    sync.RWMutex
-	cache map[string]*Image
+	mu      sync.RWMutex
+	history map[string][]*Image
 }
 
-// New creates a new image service. If urlTemplate is empty the default NWS
-// template is used.
-func New(urlTemplate string) *Service {
-	if urlTemplate == "" {
-		urlTemplate = DefaultURLTemplate
+// New creates a new image service from the supplied config. Empty / zero
+// fields fall back to sensible defaults.
+func New(cfg Config) *Service {
+	tmpl := cfg.URLTemplate
+	if tmpl == "" {
+		tmpl = DefaultURLTemplate
 	}
+
+	retention := cfg.Retention
+	if retention <= 0 {
+		retention = DefaultRetention
+	}
+
+	client := cfg.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: defaultTimeout}
+	}
+
 	return &Service{
-		httpClient:  &http.Client{Timeout: defaultTimeout},
-		urlTemplate: urlTemplate,
-		cache:       make(map[string]*Image),
+		httpClient:  client,
+		urlTemplate: tmpl,
+		userAgent:   cfg.UserAgent,
+		retention:   retention,
+		history:     make(map[string][]*Image),
 	}
+}
+
+// Retention returns the configured retention window.
+func (s *Service) Retention() time.Duration {
+	return s.retention
 }
 
 // URLFor returns the radar image URL for the given station based on the
@@ -65,8 +108,9 @@ func (s *Service) URLFor(stationID string) string {
 	return strings.ReplaceAll(s.urlTemplate, stationPlaceholder, stationID)
 }
 
-// Fetch downloads the radar image for the station and stores it in the cache.
-// The latest image is also returned so callers can use it immediately.
+// Fetch downloads the radar image for the station, appends it to the per
+// -station history, prunes images outside the retention window, and returns
+// the freshly downloaded image so callers can use it immediately.
 func (s *Service) Fetch(stationID string) (*Image, error) {
 	if stationID == "" {
 		return nil, errors.New("stationID cannot be empty")
@@ -78,7 +122,15 @@ func (s *Service) Fetch(stationID string) (*Image, error) {
 		"url":     url,
 	}).Debug("Fetching radar image")
 
-	resp, err := s.httpClient.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building radar image request for %s: %w", stationID, err)
+	}
+	if s.userAgent != "" {
+		req.Header.Set("User-Agent", s.userAgent)
+	}
+
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching radar image for %s: %w", stationID, err)
 	}
@@ -98,37 +150,83 @@ func (s *Service) Fetch(stationID string) (*Image, error) {
 		contentType = http.DetectContentType(data)
 	}
 
+	now := time.Now()
 	img := &Image{
 		StationID:   stationID,
 		Data:        data,
 		ContentType: contentType,
-		Filename:    filenameFor(stationID, contentType),
-		FetchedAt:   time.Now(),
+		Filename:    filenameFor(stationID, contentType, now),
+		FetchedAt:   now,
 	}
 
 	s.mu.Lock()
-	s.cache[stationID] = img
+	s.history[stationID] = pruneHistory(append(s.history[stationID], img), now, s.retention)
+	count := len(s.history[stationID])
 	s.mu.Unlock()
 
 	logger.WithFields(map[string]string{
 		"station":      stationID,
 		"bytes":        fmt.Sprintf("%d", len(data)),
 		"content_type": contentType,
+		"history":      fmt.Sprintf("%d", count),
 	}).Debug("Stored radar image")
 
 	return img, nil
 }
 
-// Get returns the most recently cached image for the station, if any.
-func (s *Service) Get(stationID string) (*Image, bool) {
+// Latest returns the most recent image for the station, if any is still within
+// the retention window.
+func (s *Service) Latest(stationID string) (*Image, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	img, ok := s.cache[stationID]
-	return img, ok
+	imgs := s.history[stationID]
+	if len(imgs) == 0 {
+		return nil, false
+	}
+	return imgs[len(imgs)-1], true
 }
 
-// filenameFor builds a sensible attachment filename based on the content type.
-func filenameFor(stationID, contentType string) string {
+// History returns a copy of the cached images for the station ordered from
+// oldest to newest. Images outside the retention window are excluded.
+func (s *Service) History(stationID string) []*Image {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	imgs := s.history[stationID]
+	if len(imgs) == 0 {
+		return nil
+	}
+	out := make([]*Image, len(imgs))
+	copy(out, imgs)
+	return out
+}
+
+// pruneHistory drops entries whose FetchedAt is older than (now - retention)
+// and ensures the slice stays sorted oldest-first. Returns a slice that may
+// share backing storage with the input.
+func pruneHistory(imgs []*Image, now time.Time, retention time.Duration) []*Image {
+	if len(imgs) == 0 {
+		return imgs
+	}
+	// Keep order stable by FetchedAt; appends are normally already sorted
+	// but be defensive in case fetches complete out of order under load.
+	sort.SliceStable(imgs, func(i, j int) bool {
+		return imgs[i].FetchedAt.Before(imgs[j].FetchedAt)
+	})
+	cutoff := now.Add(-retention)
+	keepFrom := 0
+	for i, img := range imgs {
+		if !img.FetchedAt.Before(cutoff) {
+			keepFrom = i
+			break
+		}
+		keepFrom = i + 1
+	}
+	return imgs[keepFrom:]
+}
+
+// filenameFor builds a sensible attachment filename based on the content type
+// and fetch time so historical images do not collide.
+func filenameFor(stationID, contentType string, fetchedAt time.Time) string {
 	ext := "gif"
 	switch {
 	case strings.Contains(contentType, "png"):
@@ -138,5 +236,5 @@ func filenameFor(stationID, contentType string) string {
 	case strings.Contains(contentType, "gif"):
 		ext = "gif"
 	}
-	return fmt.Sprintf("%s.%s", stationID, ext)
+	return fmt.Sprintf("%s-%s.%s", stationID, fetchedAt.UTC().Format("20060102T150405Z"), ext)
 }
