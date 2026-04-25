@@ -13,6 +13,9 @@
 - Power Source
 - Generator State
 
+When a VCP change is detected, the latest radar image (downloaded at the same poll
+that detected the change) is attached to the Pushover notification.
+
 ## How To Use
 
 ### Requirements
@@ -33,6 +36,8 @@
     - `ALERT_OPERABILITY` — Enable Alerts on changes to radar operability status (default: `false`)
     - `ALERT_POWER_SOURCE` — Enable Alerts on changes to radar power source (default: `false`)
     - `ALERT_GEN_STATE` — Enable Alerts on changes to generator state (default: `false`)
+    - `RADAR_IMAGE_ENABLED` — Poll the radar image every check and attach it to VCP-change notifications (default: `true`)
+    - `RADAR_IMAGE_URL_TEMPLATE` — Override the radar image URL. Use `{station}` as the station-ID placeholder (default: NWS Ridge GIF)
  4. Enjoy!
 
 ### Standalone Container Method

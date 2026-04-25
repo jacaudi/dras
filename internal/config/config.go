@@ -17,13 +17,15 @@ import (
 
 // Config holds all configuration for the DRAS application.
 type Config struct {
-	StationInput     string
-	PushoverAPIToken string
-	PushoverUserKey  string
-	DryRun           bool
-	CheckInterval    time.Duration
-	LogLevel         string
-	AlertConfig      radar.AlertConfig
+	StationInput      string
+	PushoverAPIToken  string
+	PushoverUserKey   string
+	DryRun            bool
+	CheckInterval     time.Duration
+	LogLevel          string
+	AlertConfig       radar.AlertConfig
+	RadarImageEnabled bool
+	RadarImageURLTmpl string
 }
 
 // Load loads configuration from environment variables with proper error handling.
@@ -84,6 +86,13 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	cfg.RadarImageEnabled, err = parseBoolEnv("RADAR_IMAGE_ENABLED", "true")
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.RadarImageURLTmpl = os.Getenv("RADAR_IMAGE_URL_TEMPLATE")
 
 	return cfg, nil
 }
