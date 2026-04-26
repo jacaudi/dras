@@ -159,8 +159,16 @@ func TestVCPChangeDeliversAttachment(t *testing.T) {
 	if len(startupNotifs) != 1 || startupNotifs[0].Title != "DRAS Startup" {
 		t.Fatalf("expected startup notification, got %+v", startupNotifs)
 	}
-	if startupNotifs[0].Attachment != nil {
-		t.Errorf("startup notification should not have an attachment, got %+v", startupNotifs[0].Attachment)
+	// Startup notification carries the freshly-fetched radar image so the
+	// user has visual context the moment the monitor comes online.
+	if startupNotifs[0].Attachment == nil {
+		t.Fatal("startup notification has no attachment")
+	}
+	if string(startupNotifs[0].Attachment.Data) != string([]byte{'G', 'I', 'F', '1'}) {
+		t.Errorf("startup attachment data = %q, want %q (first image)", startupNotifs[0].Attachment.Data, []byte{'G', 'I', 'F', '1'})
+	}
+	if startupNotifs[0].Attachment.ContentType != "image/gif" {
+		t.Errorf("startup attachment content type = %q, want image/gif", startupNotifs[0].Attachment.ContentType)
 	}
 	if got := atomic.LoadInt64(&imageRequests); got != 1 {
 		t.Errorf("expected 1 image request after first poll, got %d", got)

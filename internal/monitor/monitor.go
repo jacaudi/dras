@@ -129,7 +129,8 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 		if m.config.DryRun {
 			stationLogger.Debug("Would send startup notification: %s", initialMessage)
 		} else {
-			if err := m.notifyService.SendNotification(ctx, "DRAS Startup", initialMessage); err != nil {
+			attachment := m.attachmentForStation(stationID, radarImage)
+			if err := m.notifyService.SendNotificationWithAttachment(ctx, "DRAS Startup", initialMessage, attachment); err != nil {
 				return fmt.Errorf("failed to send startup notification for station %s: %w", stationID, err)
 			}
 			stationLogger.Info("Startup notification sent successfully")
@@ -195,20 +196,32 @@ func (m *Monitor) fetchRadarImage(stationID string, stationLogger *logger.FieldL
 // notification, or nil when no attachment should be sent. Images are only
 // attached when the VCP changed, matching the user-facing feature scope.
 func (m *Monitor) attachmentForChange(stationID string, vcpChanged bool, justFetched *image.Image, stationLogger *logger.FieldLogger) *notify.Attachment {
-	if !vcpChanged || m.imageService == nil {
+	if !vcpChanged {
+		return nil
+	}
+	att := m.attachmentForStation(stationID, justFetched)
+	if att == nil {
+		stationLogger.Debug("VCP changed but no radar image available to attach")
+	}
+	return att
+}
+
+// attachmentForStation builds a notification attachment from the latest
+// available radar image for the station. It falls back to the imageService
+// cache if the just-fetched image is nil, and returns nil when no image is
+// available or image polling is disabled.
+func (m *Monitor) attachmentForStation(stationID string, justFetched *image.Image) *notify.Attachment {
+	if m.imageService == nil {
 		return nil
 	}
 
 	img := justFetched
 	if img == nil {
-		// Fall back to the most recently cached image if the latest poll
-		// failed to download a fresh one.
 		if cached, ok := m.imageService.Latest(stationID); ok {
 			img = cached
 		}
 	}
 	if img == nil {
-		stationLogger.Debug("VCP changed but no radar image available to attach")
 		return nil
 	}
 
