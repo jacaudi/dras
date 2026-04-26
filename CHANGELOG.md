@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.5.0](https://github.com/jacaudi/dras/compare/v2.4.0...v2.5.0) (2026-04-26)
+
+### Features
+
+* **notify:** attach radar image to startup notification ([7293646](https://github.com/jacaudi/dras/commit/7293646c0e9d4a7abf8ae8b6dcb8794a4a7eef6f))
+
 ## [2.4.0](https://github.com/jacaudi/dras/compare/v2.3.3...v2.4.0) (2026-04-26)
 
 ### Features
