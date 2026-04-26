@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.3](https://github.com/jacaudi/dras/compare/v2.3.2...v2.3.3) (2026-04-26)
+
+### Bug Fixes
+
+* **deps:** bump github.com/jacaudi/nws to v0.1.0 ([95611b9](https://github.com/jacaudi/dras/commit/95611b95442b0483eb8613a3948acbc318ae3614))
+
 ## [2.3.2](https://github.com/jacaudi/dras/compare/v2.3.1...v2.3.2) (2026-04-26)
 
 ### Bug Fixes
