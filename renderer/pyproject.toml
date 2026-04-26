@@ -38,6 +38,7 @@ dev = [
     "moto[s3]>=5.0",
     "ruff>=0.7",
     "mypy>=1.13",
+    "types-cachetools>=5.5",
 ]
 
 [tool.pytest.ini_options]

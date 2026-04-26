@@ -18,7 +18,7 @@ def run() -> None:
     )
     uvicorn.run(
         build_app(),
-        host="0.0.0.0",  # noqa: S104 — service is namespace-internal
+        host="0.0.0.0",  # service is namespace-internal; not a public bind
         port=cfg.port,
         log_level=cfg.log_level.lower(),
     )
