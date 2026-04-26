@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.2](https://github.com/jacaudi/dras/compare/v2.3.1...v2.3.2) (2026-04-26)
+
+### Bug Fixes
+
+* **ci:** publish v<major>, v<major>.<minor>, latest container tags ([a1ba477](https://github.com/jacaudi/dras/commit/a1ba477953bbf387c7c93dcfb280bdb1dce8f2d1))
+
 ## [2.3.1](https://github.com/jacaudi/dras/compare/v2.3.0...v2.3.1) (2026-04-26)
 
 ### Bug Fixes
