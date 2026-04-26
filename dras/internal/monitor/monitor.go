@@ -17,7 +17,7 @@ import (
 type Monitor struct {
 	radarService  radar.DataFetcher
 	notifyService notify.Notifier
-	imageService  *image.Service
+	imageService  image.Source         // was: *image.Service
 	config        *config.Config
 	radarDataMap  map[string]map[string]interface{}
 	mu            sync.Mutex
@@ -26,7 +26,7 @@ type Monitor struct {
 // New creates a new monitor instance. imageService may be nil to disable
 // fetching and attaching radar images. notifyService may also be nil when
 // running in dry-run mode.
-func New(radarService radar.DataFetcher, notifyService notify.Notifier, imageService *image.Service, cfg *config.Config) *Monitor {
+func New(radarService radar.DataFetcher, notifyService notify.Notifier, imageService image.Source, cfg *config.Config) *Monitor {
 	return &Monitor{
 		radarService:  radarService,
 		notifyService: notifyService,

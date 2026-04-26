@@ -42,6 +42,16 @@ type Image struct {
 	FetchedAt   time.Time
 }
 
+// Source supplies radar images for stations. Implementations decide where
+// images come from (downloaded GIFs, rendered Level II data, etc).
+type Source interface {
+	// Fetch returns the latest image for the station.
+	Fetch(stationID string) (*Image, error)
+	// Latest returns the most recent successful image for the station, if
+	// any is still within the implementation's retention window.
+	Latest(stationID string) (*Image, bool)
+}
+
 // Config configures an image Service.
 type Config struct {
 	// URLTemplate is the radar image URL with "{station}" as the station-ID

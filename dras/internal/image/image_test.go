@@ -152,6 +152,9 @@ func TestFetchEmptyStationID(t *testing.T) {
 	}
 }
 
+// Compile-time check that *Service satisfies Source.
+var _ Source = (*Service)(nil)
+
 func TestFilenameForExtension(t *testing.T) {
 	ts := time.Date(2026, 4, 25, 12, 30, 45, 0, time.UTC)
 	tests := []struct {
