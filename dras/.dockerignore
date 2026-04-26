@@ -1,0 +1,11 @@
+# Files
+Dockerfile
+
+# Test files (not needed in the runtime image)
+*_test.go
+internal/**/*_test.go
+
+# Build artifacts
+dras
+bin/
+build/
