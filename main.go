@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jacaudi/dras/internal/config"
 	"github.com/jacaudi/dras/internal/image"
@@ -77,9 +78,21 @@ func main() {
 			Retention:   cfg.RadarImageRetention,
 			UserAgent:   userAgent,
 		})
+		var pollStations []string
+		if cfg.DryRun {
+			// Mirrors the dry-run defaults in monitor.Start.
+			pollStations = []string{"KATX", "KRAX"}
+		} else {
+			pollStations = radar.SanitizeStationIDs(cfg.StationInput)
+		}
+		pollURLs := make([]string, len(pollStations))
+		for i, s := range pollStations {
+			pollURLs[i] = imageService.URLFor(s)
+		}
 		logger.WithFields(map[string]string{
-			"url_template": imageService.URLFor("{station}"),
-			"retention":    cfg.RadarImageRetention.String(),
+			"stations":  strings.Join(pollStations, ","),
+			"urls":      strings.Join(pollURLs, ","),
+			"retention": cfg.RadarImageRetention.String(),
 		}).Info("Radar image polling enabled")
 	} else {
 		logger.Info("Radar image polling disabled")
