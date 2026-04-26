@@ -3,7 +3,10 @@
 version: 2
 project_name: dras
 builds:
-  - env: 
+  - dir: ./dras
+    main: ./main.go
+    binary: dras
+    env:
       - CGO_ENABLED=0
     goos:
       - linux

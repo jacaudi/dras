@@ -24,7 +24,7 @@ go.work.sum
 # Go Binary
 bin/
 build/
-dras
+dras/dras
 
 # env file
 .env

@@ -41,7 +41,8 @@ jobs:
       - name: Build (amd64)
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: dras
+          file: dras/Dockerfile
           platforms: linux/amd64
           push: false
           load: true
@@ -63,7 +64,8 @@ jobs:
       - name: Build (arm64)
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: dras
+          file: dras/Dockerfile
           platforms: linux/arm64
           push: false
           load: true
