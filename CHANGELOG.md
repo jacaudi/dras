@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.0](https://github.com/jacaudi/dras/compare/v2.3.3...v2.4.0) (2026-04-26)
+
+### Features
+
+* **log:** show configured stations and rendered URLs in polling-enabled log ([845c693](https://github.com/jacaudi/dras/commit/845c6932fc9dc5c67304a73926bbdb01a41009ca))
+
 ## [2.3.3](https://github.com/jacaudi/dras/compare/v2.3.2...v2.3.3) (2026-04-26)
 
 ### Bug Fixes
