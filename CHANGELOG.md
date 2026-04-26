@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1](https://github.com/jacaudi/dras/compare/v2.3.0...v2.3.1) (2026-04-26)
+
+### Bug Fixes
+
+* **ci:** chain container build after release to bypass skip-ci block ([21c7c79](https://github.com/jacaudi/dras/commit/21c7c79cbdb066cfc0a66411e204c7e225492daa))
+
 ## [2.3.0](https://github.com/jacaudi/dras/compare/v2.2.4...v2.3.0) (2026-04-25)
 
 ### Features
