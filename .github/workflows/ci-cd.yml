@@ -55,10 +55,28 @@ jobs:
       app-id: ${{ secrets.APP_ID }}
       app-private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-  # Build and push multi-arch container images. Runs in the same workflow
-  # run as `release`, so [skip ci] on the release commit doesn't block it.
-  container:
+  # Derive major and major.minor from the released semver so the container
+  # image gets the full set of moving tags (v2, v2.3, v2.3.1).
+  version-parts:
     needs: [release]
+    if: needs.release.outputs.new-release-published == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      major: ${{ steps.parse.outputs.major }}
+      minor: ${{ steps.parse.outputs.minor }}
+    steps:
+      - id: parse
+        env:
+          VERSION: ${{ needs.release.outputs.new-release-version }}
+        run: |
+          echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+          echo "minor=$(echo "$VERSION" | cut -d. -f1-2)" >> "$GITHUB_OUTPUT"
+
+  # Build and push multi-arch container images. Runs in the same workflow
+  # run as `release`, so the skip-ci marker on the release commit doesn't
+  # block it.
+  container:
+    needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
     uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.1
     permissions:
@@ -71,8 +89,10 @@ jobs:
       push: true
       version: ${{ needs.release.outputs.new-release-version-v }}
       tags: |
-        ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new-release-version-v }}
         ghcr.io/${{ github.repository }}:latest
+        ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new-release-version-v }}
+        ghcr.io/${{ github.repository }}:v${{ needs.version-parts.outputs.minor }}
+        ghcr.io/${{ github.repository }}:v${{ needs.version-parts.outputs.major }}
     secrets: inherit
 
   pipeline-summary:
