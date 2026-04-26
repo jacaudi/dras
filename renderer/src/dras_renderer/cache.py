@@ -6,11 +6,15 @@ from cachetools import LRUCache
 
 
 class RenderCache:
-    """Thread-naive LRU cache keyed by (station_id, scan_filename).
+    """LRU cache keyed by (station_id, scan_filename).
 
-    The renderer is single-replica and FastAPI handles requests sequentially
-    per worker, so locking is not required for correctness here. If we ever
-    add async concurrency for renders, revisit.
+    Holds rendered PNG bytes in memory, bounded by ``max_size``. Single
+    operations on the underlying ``cachetools.LRUCache`` are safe under
+    CPython's GIL, and this class performs no read-modify-write sequence,
+    so no locking is required as written. Note that ``get`` promotes the
+    entry to most-recently-used (standard LRU semantics). If we ever add
+    a single-flight render path that does miss-then-set across awaits,
+    revisit and add cross-call coordination.
     """
 
     def __init__(self, max_size: int) -> None:
