@@ -54,13 +54,15 @@ ENV DRAS_RENDERER_VERSION=${VERSION} \
     MPLBACKEND=Agg \
     PATH="/app/.venv/bin:$PATH"
 
-# Runtime libs only — no -dev packages. Use libgdal36 (bookworm slim ships GDAL
-# 3.6 series; libgdal32 is older Debian).
+# Runtime libs only — no -dev packages. bookworm-slim ships GDAL 3.6 binaries
+# under the libgdal32 SONAME package (verified from libgdal-dev's runtime deps
+# in this build context). The number suffix tracks the SO-version, not the
+# upstream release: GDAL 3.6.x → libgdal32.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgeos-c1v5 \
         libproj25 \
         proj-data \
-        libgdal36 \
+        libgdal32 \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --create-home --uid 10001 renderer

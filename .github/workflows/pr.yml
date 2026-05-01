@@ -18,6 +18,7 @@ jobs:
     with:
       yaml: true
       go: true
+      working-directory: dras
 
   test:
     name: Run Tests
@@ -25,6 +26,7 @@ jobs:
     with:
       test-framework: go
       coverage: true
+      working-directory: dras
 
   lint-renderer:
     name: Lint Renderer

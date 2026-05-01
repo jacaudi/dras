@@ -27,6 +27,7 @@ jobs:
     with:
       yaml: true
       go: true
+      working-directory: dras
     secrets: inherit
 
   test:
@@ -36,6 +37,7 @@ jobs:
     with:
       test-framework: go
       coverage: true
+      working-directory: dras
     secrets: inherit
 
   release:
