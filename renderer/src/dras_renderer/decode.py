@@ -31,7 +31,8 @@ def decode_level2_archive(volume_bytes: bytes) -> DecodedScan:
     """Decode a Level II Archive volume.
 
     Args:
-        volume_bytes: raw Level II Archive bytes (post-bunzip in the chunks path).
+        volume_bytes: raw Level II Archive bytes (byte-identical whether sourced
+            from an archive _V06 object or assembled from chunks).
 
     Raises:
         ValueError: if Py-ART cannot parse the input.

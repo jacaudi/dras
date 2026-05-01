@@ -12,7 +12,6 @@ as-is — the renderer will operate on whatever chunks are present.
 
 from __future__ import annotations
 
-import bz2
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -132,20 +131,23 @@ class S3Client:
         )
 
     def download_volume(self, volume: LatestVolume) -> bytes:
-        """Fetch all chunks for ``volume``, concatenate in chunk-num order, bunzip."""
-        compressed_parts: list[bytes] = []
+        """Fetch all chunks for ``volume`` and concatenate them in chunk-num order.
+
+        The result is a Level II Archive blob byte-identical to a ``_V06`` file:
+        ``[AR2V volume header from chunk 1][LDM-record-framed bzip2 streams from
+        every chunk]``. Py-ART's ``read_nexrad_archive`` handles the per-record
+        bzip2 decompression itself; we must NOT decompress at this layer.
+        """
+        chunk_bodies: list[bytes] = []
         for key in volume.chunk_keys:
             try:
                 resp = self._client.get_object(Bucket=self.bucket, Key=key)
             except ClientError as e:
                 code = e.response.get("Error", {}).get("Code", "")
                 raise S3Error(f"S3 get_object failed on {key}: {code}") from e
-            compressed_parts.append(cast(bytes, resp["Body"].read()))
+            chunk_bodies.append(cast(bytes, resp["Body"].read()))
 
-        try:
-            return bz2.decompress(b"".join(compressed_parts))
-        except OSError as e:
-            raise S3Error(f"bzip2 decompress failed: {e}") from e
+        return b"".join(chunk_bodies)
 
     def _list_keys(self, prefix: str) -> list[str]:
         keys: list[str] = []

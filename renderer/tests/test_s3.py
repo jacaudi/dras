@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import bz2
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -22,7 +21,7 @@ BUCKET = "unidata-nexrad-level2-chunks"
 
 
 def _put_chunk(s3: object, key: str, payload: bytes) -> None:
-    s3.put_object(Bucket=BUCKET, Key=key, Body=bz2.compress(payload))
+    s3.put_object(Bucket=BUCKET, Key=key, Body=payload)
 
 
 @pytest.fixture
@@ -83,14 +82,14 @@ def test_latest_volume_caches_within_ttl(mock_bucket: str) -> None:
         assert v1 is v2
 
 
-def test_download_volume_concatenates_and_bunzips(mock_bucket: str) -> None:
-    """Vol 17's two chunks decompress to b'v17-S' + b'v17-I'."""
+def test_download_volume_concatenates_chunks(mock_bucket: str) -> None:
+    """Vol 17's two chunk bodies are concatenated as-is — Py-ART handles internal bzip2."""
     with mock_aws():
         client = _make_client()
         v = client.latest_volume("KATX")
         assert v is not None
         body = client.download_volume(v)
-        assert body == b"v17-Sv17-I"
+        assert body == b"v17-S" + b"v17-I"
 
 
 def test_download_volume_raises_s3error_on_missing_chunk(mock_bucket: str) -> None:
@@ -140,6 +139,6 @@ def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
             "KATX/9/20260429-120500-002-I",
             "KATX/9/20260429-120500-003-E",
         )
-        # download_volume must produce only the new volume's payloads.
+        # download_volume must produce only the new volume's payloads, concatenated as-is.
         body = client.download_volume(v)
-        assert body == b"new-Snew-Inew-E"
+        assert body == b"new-S" + b"new-I" + b"new-E"
