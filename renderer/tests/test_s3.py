@@ -144,6 +144,36 @@ def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
         assert body == b"new-S" + b"new-I" + b"new-E"
 
 
+def test_latest_volume_with_tied_prefixes_returns_a_valid_slot() -> None:
+    """Tie case: when two slots share the YYYYMMDD-HHMMSS prefix of their
+    newest chunk, the picker must return one of them deterministically and
+    return only that slot's chunks.
+
+    For well-formed NEXRAD filenames the prefix-only and full-filename
+    comparisons agree whenever timestamps differ (the prefix is the
+    leftmost varying field, so it dominates lex order). The two algorithms
+    can only disagree when prefixes tie — and even then, either slot is
+    a valid answer. This test pins the post-condition: the returned
+    chunk_keys belong to a single, real slot.
+    """
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # Same timestamp prefix; suffix differs across slots.
+        _put_chunk(s3, "KATX/5/20260429-120000-001-S", b"a")
+        _put_chunk(s3, "KATX/5/20260429-120000-002-I", b"b")
+        _put_chunk(s3, "KATX/5/20260429-120000-003-E", b"c")
+        _put_chunk(s3, "KATX/17/20260429-120000-001-S", b"x")
+        _put_chunk(s3, "KATX/17/20260429-120000-002-I", b"y")
+
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        assert v.volume_number in {5, 17}
+        assert all(k.startswith(f"KATX/{v.volume_number}/20260429-120000-") for k in v.chunk_keys)
+        assert v.latest_chunk_time == datetime(2026, 4, 29, 12, 0, 0, tzinfo=UTC)
+
+
 def test_download_volume_concatenates_in_chunk_keys_order() -> None:
     """Output bytes must be in chunk_keys order regardless of fetch completion order.
 
