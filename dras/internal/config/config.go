@@ -27,6 +27,8 @@ type Config struct {
 	RadarImageEnabled   bool
 	RadarImageURLTmpl   string
 	RadarImageRetention time.Duration
+	RendererURL         string
+	RendererTimeout     time.Duration
 }
 
 // Load loads configuration from environment variables with proper error handling.
@@ -103,6 +105,17 @@ func Load() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid RADAR_IMAGE_RETENTION value '%s': %w", retentionStr, err)
 		}
+	}
+
+	cfg.RendererURL = strings.TrimSpace(os.Getenv("RENDERER_URL"))
+
+	cfg.RendererTimeout = 30 * time.Second
+	if v := os.Getenv("RENDERER_TIMEOUT"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return nil, fmt.Errorf("parse RENDERER_TIMEOUT %q: %w", v, err)
+		}
+		cfg.RendererTimeout = d
 	}
 
 	return cfg, nil

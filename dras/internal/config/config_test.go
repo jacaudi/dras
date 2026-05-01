@@ -245,6 +245,50 @@ func TestMaskString(t *testing.T) {
 	}
 }
 
+func TestRendererURLLoadedFromEnv(t *testing.T) {
+	t.Setenv("RENDERER_URL", "http://dras-renderer:8080")
+	t.Setenv("PUSHOVER_API_TOKEN", "x")
+	t.Setenv("PUSHOVER_USER_KEY", "x")
+	t.Setenv("STATION_IDS", "KATX")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RendererURL != "http://dras-renderer:8080" {
+		t.Errorf("RendererURL = %q", cfg.RendererURL)
+	}
+}
+
+func TestRendererTimeoutDefaultIs30Seconds(t *testing.T) {
+	t.Setenv("PUSHOVER_API_TOKEN", "x")
+	t.Setenv("PUSHOVER_USER_KEY", "x")
+	t.Setenv("STATION_IDS", "KATX")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RendererTimeout != 30*time.Second {
+		t.Errorf("RendererTimeout = %v", cfg.RendererTimeout)
+	}
+}
+
+func TestRendererTimeoutOverridable(t *testing.T) {
+	t.Setenv("RENDERER_TIMEOUT", "45s")
+	t.Setenv("PUSHOVER_API_TOKEN", "x")
+	t.Setenv("PUSHOVER_USER_KEY", "x")
+	t.Setenv("STATION_IDS", "KATX")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.RendererTimeout != 45*time.Second {
+		t.Errorf("RendererTimeout = %v", cfg.RendererTimeout)
+	}
+}
+
 func TestConfig_String(t *testing.T) {
 	t.Run("dry run mode", func(t *testing.T) {
 		cfg := &Config{

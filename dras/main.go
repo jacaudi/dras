@@ -11,6 +11,7 @@ import (
 	"github.com/jacaudi/dras/internal/monitor"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
+	"github.com/jacaudi/dras/internal/renderer"
 	"github.com/jacaudi/dras/internal/version"
 	"github.com/jacaudi/nws/cmd/nws"
 )
@@ -70,36 +71,55 @@ func main() {
 		logger.Info("Running in dry-run mode, notifications disabled")
 	}
 
-	// Initialize image service for polling and attaching radar images on VCP changes
-	var imageService *image.Service
-	if cfg.RadarImageEnabled {
-		imageService = image.New(image.Config{
+	// Initialize image source. Three mutually-exclusive modes:
+	//   - Advanced (RENDERER_URL set): HTTP renderer service.
+	//   - Basic   (RENDERER_URL empty, RadarImageEnabled true): legacy ridge GIF fetcher.
+	//   - Disabled (neither): no image attached to notifications.
+	var imageSource image.Source
+	switch {
+	case cfg.RendererURL != "":
+		imageSource = renderer.New(renderer.Config{
+			BaseURL:   cfg.RendererURL,
+			Timeout:   cfg.RendererTimeout,
+			UserAgent: userAgent,
+		})
+		logger.WithFields(map[string]string{
+			"mode":             "advanced",
+			"renderer_url":     cfg.RendererURL,
+			"renderer_timeout": cfg.RendererTimeout.String(),
+		}).Info("Radar image source enabled")
+
+	case cfg.RadarImageEnabled:
+		svc := image.New(image.Config{
 			URLTemplate: cfg.RadarImageURLTmpl,
 			Retention:   cfg.RadarImageRetention,
 			UserAgent:   userAgent,
 		})
+		imageSource = svc
+
 		var pollStations []string
 		if cfg.DryRun {
-			// Mirrors the dry-run defaults in monitor.Start.
 			pollStations = []string{"KATX", "KRAX"}
 		} else {
 			pollStations = radar.SanitizeStationIDs(cfg.StationInput)
 		}
 		pollURLs := make([]string, len(pollStations))
 		for i, s := range pollStations {
-			pollURLs[i] = imageService.URLFor(s)
+			pollURLs[i] = svc.URLFor(s)
 		}
 		logger.WithFields(map[string]string{
+			"mode":      "basic",
 			"stations":  strings.Join(pollStations, ","),
 			"urls":      strings.Join(pollURLs, ","),
 			"retention": cfg.RadarImageRetention.String(),
-		}).Info("Radar image polling enabled")
-	} else {
-		logger.Info("Radar image polling disabled")
+		}).Info("Radar image source enabled")
+
+	default:
+		logger.Info("Radar image source disabled")
 	}
 
 	// Initialize monitor
-	monitorService := monitor.New(radarService, notifyService, imageService, cfg)
+	monitorService := monitor.New(radarService, notifyService, imageSource, cfg)
 
 	// Start monitoring
 	logger.Info("Starting radar monitoring service")
