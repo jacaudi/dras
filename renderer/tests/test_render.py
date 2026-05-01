@@ -41,3 +41,18 @@ def test_render_respects_range_km(decoded: DecodedScan) -> None:
     img_a = Image.open(io.BytesIO(a))
     img_b = Image.open(io.BytesIO(b))
     assert img_a.size == img_b.size
+
+
+def test_matplotlib_uses_agg_backend() -> None:
+    """matplotlib.use('Agg') in render.py must select the Agg backend at import time.
+
+    This regression-locks the headless-backend selection across the M5 change
+    that drops the redundant ``os.environ["MPLBACKEND"] = "Agg"`` line — the
+    explicit ``matplotlib.use("Agg")`` call is authoritative.
+    """
+    import matplotlib
+
+    # Importing dras_renderer.render forces matplotlib.use('Agg') to execute.
+    import dras_renderer.render  # noqa: F401
+
+    assert matplotlib.get_backend().lower() == "agg"
