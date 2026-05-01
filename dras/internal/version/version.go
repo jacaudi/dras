@@ -35,7 +35,7 @@ func (i Info) String() string {
 	if !isDev {
 		version = "v" + version
 	}
-	
+
 	if isDev {
 		return fmt.Sprintf("DRAS %s (commit: %s, branch: %s, go: %s)",
 			version, i.GitCommit, i.GitBranch, i.GoVersion)

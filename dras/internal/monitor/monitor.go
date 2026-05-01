@@ -17,7 +17,7 @@ import (
 type Monitor struct {
 	radarService  radar.DataFetcher
 	notifyService notify.Notifier
-	imageService  image.Source         // was: *image.Service
+	imageService  image.Source
 	config        *config.Config
 	radarDataMap  map[string]map[string]interface{}
 	mu            sync.Mutex
