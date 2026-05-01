@@ -39,16 +39,17 @@ def decode_level2_archive(volume_bytes: bytes) -> DecodedScan:
     """
     try:
         radar = pyart.io.read_nexrad_archive(io.BytesIO(volume_bytes))
+        return DecodedScan(
+            radar=radar,
+            station_id=_extract_station(radar),
+            scan_time=_extract_scan_time(radar),
+            elevation_deg=float(radar.fixed_angle["data"][0]),
+            vcp=_extract_vcp(radar),
+        )
+    except ValueError:
+        raise  # Already the right type (e.g. unexpected time-units format).
     except Exception as exc:  # Py-ART raises a varied set of errors; catch all.
         raise ValueError(f"failed to decode Level II archive: {exc}") from exc
-
-    return DecodedScan(
-        radar=radar,
-        station_id=_extract_station(radar),
-        scan_time=_extract_scan_time(radar),
-        elevation_deg=float(radar.fixed_angle["data"][0]),
-        vcp=_extract_vcp(radar),
-    )
 
 
 def _extract_station(radar: Any) -> str:
@@ -63,13 +64,19 @@ def _extract_scan_time(radar: Any) -> datetime:
     prefix = "seconds since "
     if not units.startswith(prefix):
         raise ValueError(f"unexpected Py-ART time units format: {units!r}")
-    iso = units[len(prefix) :].rstrip("Z")
+    iso = units[len(prefix) :].removesuffix("Z")
     return datetime.fromisoformat(iso).replace(tzinfo=UTC)
 
 
 def _extract_vcp(radar: Any) -> int:
-    """Read VCP number from the volume coverage pattern, if present."""
-    raw = radar.metadata.get("vcp_pattern") or radar.metadata.get("vcp", 0)
+    """Read VCP number from the volume coverage pattern, if present.
+
+    Uses ``is not None`` rather than truthy fallback so a present-but-zero
+    value isn't silently treated as missing.
+    """
+    raw = radar.metadata.get("vcp_pattern")
+    if raw is None:
+        raw = radar.metadata.get("vcp", 0)
     try:
         return int(raw)
     except (TypeError, ValueError):
