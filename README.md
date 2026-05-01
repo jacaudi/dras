@@ -1,82 +1,182 @@
 [![On Merge](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml) [![Versioned Release](https://github.com/jacaudi/dras/actions/workflows/on-release.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-release.yml)
 
-# DRAS — Doppler Radar Notification Service
+# DRAS — Doppler Radar Alerting Service
 
- This programs monitors either a single, or multiple, WSR-88D sites and sends alerts via Pushover based on change in status.
+DRAS monitors one or more WSR-88D sites via the NWS API and sends a
+Pushover notification with a radar image whenever the radar's status,
+mode, or VCP changes.
 
-## What Is Monitored
+## Two deployment modes
 
- The following attributes are monitored per each site
+DRAS picks an image source at startup based on `RENDERER_URL`:
+
+| Mode | Image source | Footprint | When to choose |
+|---|---|---|---|
+| **Basic** (default) | NWS pre-rendered ridge GIF (600×550) | Single small Go binary (~15 MB) | Quick setup, low resource budget, casual use. |
+| **Advanced** | `dras-renderer` decoding NEXRAD Level II from S3 | Adds a ~700 MB Python container | Higher-quality rendering, custom range/dimensions, future products (velocity, composite). |
+
+Modes are mutually exclusive. Set `RENDERER_URL` to opt into advanced
+mode; leave it unset (and keep `RADAR_IMAGE_ENABLED=true`) for the
+existing basic behavior.
+
+## What is monitored
+
+Per station:
 
 - Volume Coverage Pattern (VCP) — Clear Air or Precipitation Mode
 - Operational Status
 - Power Source
 - Generator State
 
-Each poll downloads the latest radar image and keeps a sliding window of the last
-hour of images per station (configurable via `RADAR_IMAGE_RETENTION`). When a VCP
-change is detected, the freshly downloaded image is attached to the Pushover
-notification. All radar image requests use the same User-Agent as the NWS API
-calls.
+When the VCP changes, the freshly fetched image (ridge GIF in basic mode,
+rendered Level II PPI in advanced mode) is attached to the Pushover
+notification.
 
-## How To Use
+---
 
-### Requirements
+## Quick start (Basic deployment)
 
-- Pushover Account
-- A device with the pushover mobile application installed
-
-### Binary Method
-
- 1. Assuming you have Go installed on your system, head over to the Github [Releases](https://github.com/jacaudi/dras/releases) and grab the URL to the latest release.
- 2. Run go install URL (e.g. `go install github.com/jacaudi/dras@v1.0.0`)
- 3. Be sure to set the following Environmental Variables
-    - `STATION_IDS` — WSR-88D (Radar) Sites (e.g. KRAX - Raleigh/Durham)
-    - `PUSHOVER_USER_KEY` — Your Pushover User Key
-    - `PUSHOVER_API_TOKEN` — Your Pushover API Token
-    - `ALERT_VCP` — Enable Alerts on changes to Volume Coverage Pattern (default: `true`)
-    - `ALERT_STATUS` — Enable Alerts on changes to radar operational status (default: `false`)
-    - `ALERT_OPERABILITY` — Enable Alerts on changes to radar operability status (default: `false`)
-    - `ALERT_POWER_SOURCE` — Enable Alerts on changes to radar power source (default: `false`)
-    - `ALERT_GEN_STATE` — Enable Alerts on changes to generator state (default: `false`)
-    - `RADAR_IMAGE_ENABLED` — Poll the radar image every check and attach it to VCP-change notifications (default: `true`)
-    - `RADAR_IMAGE_URL_TEMPLATE` — Override the radar image URL. Use `{station}` as the station-ID placeholder (default: NWS Ridge GIF — the highest-resolution per-station single image NWS publishes via static URL)
-    - `RADAR_IMAGE_RETENTION` — Sliding window of polled images kept per station, parsed as a Go duration like `1h` or `30m` (default: `1h`)
- 4. Enjoy!
-
-### Standalone Container Method
+### Standalone container
 
 ```bash
-docker pull ghcr.io/jacaudi/dras:v1.0.0
-
 docker run -d \
   -e STATION_IDS=KRAX \
   -e PUSHOVER_USER_KEY=<KEY> \
   -e PUSHOVER_API_TOKEN=<TOKEN> \
-  -e ALERT_VCP=false \
-  -e ALERT_STATUS=true \
-  -e ALERT_OPERABILITY=true \
-  ghcr.io/jacaudi/dras:v1.0.0
+  ghcr.io/jacaudi/dras:latest
 ```
 
-### Kubernetes Method
+### Kubernetes
 
- See the [kubernetes](examples/kubernetes.yaml) file in [examples](examples) folder — It contains an example deployment, configmap, and secret.
+See [`examples/kubernetes.yaml`](examples/kubernetes.yaml) for a
+deployment + configmap + secret skeleton.
+
+### Binary
+
+```bash
+go install github.com/jacaudi/dras@latest
+STATION_IDS=KRAX PUSHOVER_USER_KEY=... PUSHOVER_API_TOKEN=... dras
+```
+
+---
+
+## Advanced deployment
+
+Run `dras` alongside the [`dras-renderer`](./renderer/) container and
+point `RENDERER_URL` at it.
+
+### Docker Compose
+
+```yaml
+services:
+  dras-renderer:
+    image: ghcr.io/jacaudi/dras-renderer:latest
+    restart: unless-stopped
+
+  dras:
+    image: ghcr.io/jacaudi/dras:latest
+    environment:
+      RENDERER_URL: http://dras-renderer:8080
+      PUSHOVER_API_TOKEN: ...
+      PUSHOVER_USER_KEY: ...
+      STATION_IDS: KATX,KRAX
+    depends_on:
+      - dras-renderer
+    restart: unless-stopped
+```
+
+### What you get
+
+Rendered base reflectivity from the most recent Level II volume scan,
+NWSRef color scale, Cartopy basemap with state and coastline outlines.
+The renderer fetches volumes from `s3://unidata-nexrad-level2-chunks/`
+(NOAA real-time public bucket; anonymous access).
+
+### Trade-offs
+
+- Extra container, ~700 MB image, ~512 MB RAM minimum per replica.
+- Egress to `*.s3.amazonaws.com` required for the renderer.
+- If the renderer is unreachable, the Pushover notification still goes
+  out — text-only, no image. DRAS does not fall back to the ridge GIF in
+  advanced mode.
+
+---
+
+## Configuration
+
+| env | default | meaning |
+|---|---|---|
+| `STATION_IDS` | required | Space/comma/semicolon-separated 4-letter NEXRAD station IDs (e.g. `KATX,KRAX`). |
+| `PUSHOVER_API_TOKEN` | required (unless `DRY_RUN=true`) | Pushover API token. |
+| `PUSHOVER_USER_KEY` | required (unless `DRY_RUN=true`) | Pushover user key. |
+| `CHECK_INTERVAL` | `5m` | Poll cadence per station. |
+| `DRY_RUN` | `false` | Disable Pushover; use test stations KATX/KRAX. |
+| `RENDERER_URL` | unset | **Advanced mode:** HTTP endpoint of `dras-renderer`. Empty → basic mode. |
+| `RENDERER_TIMEOUT` | `30s` | HTTP timeout for renderer calls. |
+| `RADAR_IMAGE_ENABLED` | `true` | **Basic mode:** enable/disable ridge image attach. Ignored in advanced mode. |
+| `RADAR_IMAGE_URL_TEMPLATE` | NWS Ridge GIF | Basic mode: override the per-station image URL. Use `{station}` as the placeholder. |
+| `RADAR_IMAGE_RETENTION` | `1h` | Basic mode: sliding window of polled images kept per station (Go duration). |
+| `ALERT_VCP` | `true` | Notify on VCP changes. |
+| `ALERT_STATUS` | `false` | Notify on operational status changes. |
+| `ALERT_OPERABILITY` | `false` | Notify on operability status changes. |
+| `ALERT_POWER_SOURCE` | `false` | Notify on power source changes. |
+| `ALERT_GEN_STATE` | `false` | Notify on generator state changes. |
+
+---
+
+## Architecture
+
+In advanced mode:
+
+```
+┌────────────┐  HTTP/JSON   ┌────────────────────┐
+│   dras     │ ───────────▶ │   dras-renderer    │
+│   (Go)     │              │ Py-ART, matplotlib │
+│            │ ◀─────────── │ Cartopy, FastAPI   │
+└────────────┘   PNG (b64)  └─────────┬──────────┘
+                                      │
+                                      ▼
+              s3://unidata-nexrad-level2-chunks/
+              (real-time NEXRAD Level II chunks)
+```
+
+In basic mode `dras` downloads `radar.weather.gov/ridge/standard/{station}_0.gif`
+directly.
+
+See [`docs/plans/`](./docs/plans/) for the design and implementation
+plan for the renderer split.
+
+---
+
+## Repository layout
+
+- [`dras/`](./dras/) — the Go service (orchestrator + Pushover notifier).
+- [`renderer/`](./renderer/) — the optional Python rendering service.
+- [`docs/plans/`](./docs/plans/) — design and implementation plans.
+- [`examples/`](./examples/) — Kubernetes deployment example.
+
+---
+
+## Development
+
+- Working on `dras` (Go): see [`dras/README.md`](./dras/README.md).
+- Working on `dras-renderer` (Python): see [`renderer/README.md`](./renderer/README.md).
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/) with automated releases via [uplift](https://uplift.dev/).
+Semantic versioning, automated releases via [uplift](https://uplift.dev/).
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-Commits should follow [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` - Minor version bump (new features)
-- `fix:` - Patch version bump (bug fixes)
-- `feat!:` or `BREAKING CHANGE:` - Major version bump
+- `feat:` — minor version bump (new features)
+- `fix:` — patch version bump (bug fixes)
+- `feat!:` or `BREAKING CHANGE:` — major version bump
 
-Releases are automatically created when changes are merged to main.
+Both container images (`dras` and `dras-renderer`) ship under one
+unified version tag.
 
-## How To Contribute
+## Contributing
 
-This project welcomes any feature improvements or bugs found via PRs. Thank you!
+Feature improvements and bug reports welcome via PRs. Thanks!
 
 ## License
 
