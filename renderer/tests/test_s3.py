@@ -1,0 +1,144 @@
+"""Chunks-bucket S3 client tests (moto-backed)."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from datetime import UTC, datetime
+
+import boto3
+import pytest
+from botocore import UNSIGNED
+from moto import mock_aws
+
+from dras_renderer.s3 import (
+    LatestVolume,
+    S3Client,
+    S3Error,
+    VolumeNotFoundError,
+)
+
+BUCKET = "unidata-nexrad-level2-chunks"
+
+
+def _put_chunk(s3: object, key: str, payload: bytes) -> None:
+    s3.put_object(Bucket=BUCKET, Key=key, Body=payload)
+
+
+@pytest.fixture
+def mock_bucket() -> Iterator[str]:
+    """Two KATX volumes. Vol 5 is older and complete. Vol 17 is newer and in-progress (no E)."""
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+
+        # Older complete volume in slot 5 (ends with E).
+        _put_chunk(s3, "KATX/5/20260429-120000-001-S", b"v5-S")
+        _put_chunk(s3, "KATX/5/20260429-120000-002-I", b"v5-I")
+        _put_chunk(s3, "KATX/5/20260429-120000-003-E", b"v5-E")
+
+        # Newer in-progress volume in slot 17 (no E chunk yet).
+        _put_chunk(s3, "KATX/17/20260429-120500-001-S", b"v17-S")
+        _put_chunk(s3, "KATX/17/20260429-120500-002-I", b"v17-I")
+
+        yield BUCKET
+
+
+def _make_client(latest_volume_ttl: float = 0.0) -> S3Client:
+    return S3Client(
+        bucket=BUCKET,
+        region="us-east-1",
+        anonymous=False,
+        list_workers=4,
+        latest_volume_ttl=latest_volume_ttl,
+    )
+
+
+def test_latest_volume_picks_max_chunk_timestamp(mock_bucket: str) -> None:
+    """In-progress vol 17 has a newer timestamp than complete vol 5; vol 17 wins."""
+    with mock_aws():
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert isinstance(v, LatestVolume)
+        assert v.volume_number == 17
+        assert v.chunk_keys == (
+            "KATX/17/20260429-120500-001-S",
+            "KATX/17/20260429-120500-002-I",
+        )
+        assert v.latest_chunk_time == datetime(2026, 4, 29, 12, 5, 0, tzinfo=UTC)
+
+
+def test_latest_volume_returns_none_for_unknown_station(mock_bucket: str) -> None:
+    with mock_aws():
+        client = _make_client()
+        assert client.latest_volume("KZZZ") is None
+
+
+def test_latest_volume_caches_within_ttl(mock_bucket: str) -> None:
+    """Two calls within the TTL must return the exact same instance (cache hit)."""
+    with mock_aws():
+        client = _make_client(latest_volume_ttl=60.0)
+        v1 = client.latest_volume("KATX")
+        v2 = client.latest_volume("KATX")
+        assert v1 is v2
+
+
+def test_download_volume_concatenates_chunks(mock_bucket: str) -> None:
+    """Vol 17's two chunk bodies are concatenated as-is — Py-ART handles internal bzip2."""
+    with mock_aws():
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        body = client.download_volume(v)
+        assert body == b"v17-S" + b"v17-I"
+
+
+def test_download_volume_raises_s3error_on_missing_chunk(mock_bucket: str) -> None:
+    """If a chunk listed in the volume disappears between list and download, S3Error."""
+    with mock_aws():
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.delete_object(Bucket=BUCKET, Key=v.chunk_keys[0])
+        with pytest.raises(S3Error):
+            client.download_volume(v)
+
+
+def test_anonymous_mode_uses_unsigned_config() -> None:
+    """When anonymous=True, the boto3 client is built with UNSIGNED."""
+    client = S3Client(bucket=BUCKET, region="us-east-1", anonymous=True)
+    cfg = client._client.meta.config
+    assert cfg.signature_version is UNSIGNED
+
+
+def test_volume_not_found_error_subclasses_s3_error() -> None:
+    """VolumeNotFoundError must subclass S3Error so callers can catch the base."""
+    assert issubclass(VolumeNotFoundError, S3Error)
+
+
+def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
+    """A slot mid-overwrite holds chunks from two distinct volumes.
+    Only the winning volume's chunks should be returned."""
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # Slot 9 holds two chunks of an older volume (12:00:00) and three
+        # chunks of a newer volume (12:05:00) that's mid-overwrite.
+        _put_chunk(s3, "KATX/9/20260429-120000-001-S", b"old-S")
+        _put_chunk(s3, "KATX/9/20260429-120000-002-I", b"old-I")
+        _put_chunk(s3, "KATX/9/20260429-120500-001-S", b"new-S")
+        _put_chunk(s3, "KATX/9/20260429-120500-002-I", b"new-I")
+        _put_chunk(s3, "KATX/9/20260429-120500-003-E", b"new-E")
+
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        assert v.volume_number == 9
+        assert v.chunk_keys == (
+            "KATX/9/20260429-120500-001-S",
+            "KATX/9/20260429-120500-002-I",
+            "KATX/9/20260429-120500-003-E",
+        )
+        # download_volume must produce only the new volume's payloads, concatenated as-is.
+        body = client.download_volume(v)
+        assert body == b"new-S" + b"new-I" + b"new-E"

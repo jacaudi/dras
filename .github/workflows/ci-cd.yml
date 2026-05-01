@@ -27,6 +27,7 @@ jobs:
     with:
       yaml: true
       go: true
+      working-directory: dras
     secrets: inherit
 
   test:
@@ -36,6 +37,7 @@ jobs:
     with:
       test-framework: go
       coverage: true
+      working-directory: dras
     secrets: inherit
 
   release:
@@ -74,8 +76,9 @@ jobs:
 
   # Build and push multi-arch container images. Runs in the same workflow
   # run as `release`, so the skip-ci marker on the release commit doesn't
-  # block it.
-  container:
+  # block it. Two parallel jobs, one per image — same release version, same
+  # tag set, separate ghcr.io/<repo> and ghcr.io/<repo>-renderer namespaces.
+  container-dras:
     needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
     uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.1
@@ -85,6 +88,8 @@ jobs:
     with:
       registry: ghcr.io
       image-name: ${{ github.repository }}
+      context: dras
+      file: dras/Dockerfile
       platforms: linux/amd64,linux/arm64
       push: true
       version: ${{ needs.release.outputs.new-release-version-v }}
@@ -95,8 +100,30 @@ jobs:
         ghcr.io/${{ github.repository }}:v${{ needs.version-parts.outputs.major }}
     secrets: inherit
 
+  container-renderer:
+    needs: [release, version-parts]
+    if: needs.release.outputs.new-release-published == 'true'
+    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.1
+    permissions:
+      contents: read
+      packages: write
+    with:
+      registry: ghcr.io
+      image-name: ${{ github.repository }}-renderer
+      context: renderer
+      file: renderer/Dockerfile
+      platforms: linux/amd64,linux/arm64
+      push: true
+      version: ${{ needs.release.outputs.new-release-version-v }}
+      tags: |
+        ghcr.io/${{ github.repository }}-renderer:latest
+        ghcr.io/${{ github.repository }}-renderer:${{ needs.release.outputs.new-release-version-v }}
+        ghcr.io/${{ github.repository }}-renderer:v${{ needs.version-parts.outputs.minor }}
+        ghcr.io/${{ github.repository }}-renderer:v${{ needs.version-parts.outputs.major }}
+    secrets: inherit
+
   pipeline-summary:
     if: always()
-    needs: [lint, test, release, container]
+    needs: [lint, test, release, container-dras, container-renderer]
     uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.20.1
     secrets: inherit

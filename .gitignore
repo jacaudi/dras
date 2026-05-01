@@ -24,7 +24,7 @@ go.work.sum
 # Go Binary
 bin/
 build/
-dras
+dras/dras
 
 # env file
 .env
@@ -44,3 +44,13 @@ docs/plans/
 .worktrees/
 .security-key
 logs/security/
+
+# Python
+renderer/.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
