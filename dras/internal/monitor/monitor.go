@@ -108,7 +108,7 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	// Poll and store the latest radar image so it can be attached to the
 	// next change notification. Image fetch failures are logged but do not
 	// fail the whole poll.
-	radarImage := m.fetchRadarImage(stationID, stationLogger)
+	radarImage := m.fetchRadarImage(ctx, stationID, stationLogger)
 
 	// Check if we need to initialize or if this is first run
 	m.mu.Lock()
@@ -179,12 +179,12 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 
 // fetchRadarImage downloads and caches the latest radar image for the given
 // station. Returns nil if image fetching is disabled or the download fails.
-func (m *Monitor) fetchRadarImage(stationID string, stationLogger *logger.FieldLogger) *image.Image {
+func (m *Monitor) fetchRadarImage(ctx context.Context, stationID string, stationLogger *logger.FieldLogger) *image.Image {
 	if m.imageService == nil {
 		return nil
 	}
 
-	img, err := m.imageService.Fetch(stationID)
+	img, err := m.imageService.Fetch(ctx, stationID)
 	if err != nil {
 		stationLogger.Warn("Failed to fetch radar image: %v", err)
 		return nil
