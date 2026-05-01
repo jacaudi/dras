@@ -28,10 +28,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
 
 WORKDIR /app
 COPY pyproject.toml uv.lock /app/
-RUN uv sync --frozen --no-dev
+# Dependency-only sync: skip the local project so hatchling doesn't try to
+# read README.md (which we haven't COPYed yet) for the editable build.
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Copy source after dependency install for better layer caching.
+# Copy source + README after dependency install for better layer caching.
 COPY src /app/src
+COPY README.md /app/README.md
 RUN uv sync --frozen --no-dev
 
 # Pre-warm the Cartopy Natural Earth cache so first request is fast. Cartopy
