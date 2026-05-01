@@ -27,12 +27,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
 
 WORKDIR /app
+# Two-stage uv sync, by design — DO NOT consolidate:
+#   1. dependency-only sync (skips the local project) cached on
+#      pyproject.toml + uv.lock; reused as long as deps don't change.
+#   2. full sync (after src/ + README copies) installs the local package
+#      itself. README is required because hatchling reads it for the
+#      editable build's metadata.
+# Collapsing into a single COPY+sync invalidates the heavy dep layer on
+# every src change.
 COPY pyproject.toml uv.lock /app/
-# Dependency-only sync: skip the local project so hatchling doesn't try to
-# read README.md (which we haven't COPYed yet) for the editable build.
 RUN uv sync --frozen --no-dev --no-install-project
 
-# Copy source + README after dependency install for better layer caching.
 COPY src /app/src
 COPY README.md /app/README.md
 RUN uv sync --frozen --no-dev
@@ -74,6 +79,18 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 # Copy the warmed Cartopy cache and chown it for the renderer user.
 COPY --from=builder --chown=renderer:renderer /root/.local/share/cartopy /home/renderer/.local/share/cartopy
+# Verify the runtime user can actually read the cached Natural Earth data.
+# Run as the renderer UID (not root) so a future ownership/perms regression
+# in the COPY --chown above is caught at build time, not at first request.
+USER renderer
+RUN HOME=/home/renderer /app/.venv/bin/python -c "\
+import cartopy.feature as cf;\
+states=list(cf.STATES.with_scale('50m').geometries());\
+coast=list(cf.COASTLINE.with_scale('50m').geometries());\
+assert states and coast, 'cartopy cache copy is empty or unreachable';\
+print(f'cartopy cache verified: {len(states)} states, {len(coast)} coastline features')\
+"
+USER root
 COPY --chown=renderer:renderer src /app/src
 
 USER renderer
