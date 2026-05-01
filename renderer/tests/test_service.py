@@ -90,3 +90,37 @@ def test_unsupported_product_raises() -> None:
         svc.render(RenderRequest(station="KATX", product="velocity"))
     assert excinfo.value.code == "unsupported_product"
     s3.latest_volume.assert_not_called()
+
+
+def test_render_increments_s3_errors_on_list_failure() -> None:
+    """An S3Error from latest_volume must increment renderer_s3_errors_total."""
+    from dras_renderer.metrics import S3_ERRORS_TOTAL
+
+    s3 = MagicMock()
+    s3.latest_volume.side_effect = S3Error("simulated list failure")
+    svc = RenderService(s3=s3, cache=RenderCache(max_size=8))
+
+    before = S3_ERRORS_TOTAL._value.get()  # type: ignore[attr-defined]
+    with pytest.raises(ServiceError) as excinfo:
+        svc.render(RenderRequest(station="KATX"))
+    assert excinfo.value.code == "internal"
+    after = S3_ERRORS_TOTAL._value.get()  # type: ignore[attr-defined]
+    assert after == before + 1
+    s3.download_volume.assert_not_called()
+
+
+def test_render_increments_s3_errors_on_download_failure() -> None:
+    """An S3Error from download_volume must also increment renderer_s3_errors_total."""
+    from dras_renderer.metrics import S3_ERRORS_TOTAL
+
+    s3 = MagicMock()
+    s3.latest_volume.return_value = _vol()
+    s3.download_volume.side_effect = S3Error("simulated download failure")
+    svc = RenderService(s3=s3, cache=RenderCache(max_size=8))
+
+    before = S3_ERRORS_TOTAL._value.get()  # type: ignore[attr-defined]
+    with pytest.raises(ServiceError) as excinfo:
+        svc.render(RenderRequest(station="KATX"))
+    assert excinfo.value.code == "internal"
+    after = S3_ERRORS_TOTAL._value.get()  # type: ignore[attr-defined]
+    assert after == before + 1
