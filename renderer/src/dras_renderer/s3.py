@@ -13,7 +13,6 @@ as-is — the renderer will operate on whatever chunks are present.
 from __future__ import annotations
 
 import bz2
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +22,7 @@ import boto3  # type: ignore[import-untyped]
 from botocore import UNSIGNED  # type: ignore[import-untyped]
 from botocore.config import Config as BotocoreConfig  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+from cachetools import TTLCache
 
 VOLUME_SLOTS: range = range(1000)
 """Volume IDs cycle in [0, 999]."""
@@ -44,12 +44,6 @@ class LatestVolume:
     volume_number: int
     chunk_keys: tuple[str, ...]  # sorted by chunk-num (== lex order due to zero-padding)
     latest_chunk_time: datetime
-
-
-@dataclass
-class _CacheEntry:
-    value: LatestVolume | None
-    expires_at: float
 
 
 def _make_config(anonymous: bool) -> BotocoreConfig:
@@ -83,7 +77,11 @@ class S3Client:
         self._client: Any = boto3.client(
             "s3", region_name=region, config=_make_config(anonymous)
         )
-        self._latest_cache: dict[str, _CacheEntry] = {}
+        # Negative results (None for unknown stations) are cached too — that's
+        # deliberate, to suppress 1000-LIST fan-out on typo'd station IDs.
+        self._latest_cache: TTLCache[str, LatestVolume | None] = TTLCache(
+            maxsize=256, ttl=latest_volume_ttl,
+        )
 
     def latest_volume(self, station_id: str) -> LatestVolume | None:
         """Return the freshest volume for ``station_id``, or ``None`` if no chunks exist.
@@ -93,15 +91,12 @@ class S3Client:
         ``self.latest_volume_ttl`` seconds; the cached value is returned by
         identity, so repeated callers within the TTL all see the same instance.
         """
-        now = time.monotonic()
-        entry = self._latest_cache.get(station_id)
-        if entry is not None and entry.expires_at > now:
-            return entry.value
-
+        try:
+            return self._latest_cache[station_id]
+        except KeyError:
+            pass
         result = self._compute_latest_volume(station_id)
-        self._latest_cache[station_id] = _CacheEntry(
-            value=result, expires_at=now + self.latest_volume_ttl
-        )
+        self._latest_cache[station_id] = result
         return result
 
     def _compute_latest_volume(self, station_id: str) -> LatestVolume | None:
@@ -121,13 +116,18 @@ class S3Client:
         # YYYYMMDD-HHMMSS prefix in the filename determines recency.
         best_vol, best_chunks = max(non_empty, key=lambda item: item[1][-1].rsplit("/", 1)[-1])
         latest_filename = best_chunks[-1].rsplit("/", 1)[-1]
-        ts_str = latest_filename[:15]  # "YYYYMMDD-HHMMSS"
-        latest_time = datetime.strptime(ts_str, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
+        ts_prefix = latest_filename[:15]  # "YYYYMMDD-HHMMSS"
+        # Slots are reused (volume IDs cycle 0-999). A slot mid-overwrite can hold
+        # chunks from two distinct volumes; keep only the winning volume's chunks.
+        volume_chunks = tuple(
+            k for k in best_chunks if k.rsplit("/", 1)[-1].startswith(ts_prefix)
+        )
+        latest_time = datetime.strptime(ts_prefix, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
 
         return LatestVolume(
             station_id=station_id,
             volume_number=best_vol,
-            chunk_keys=tuple(best_chunks),
+            chunk_keys=volume_chunks,
             latest_chunk_time=latest_time,
         )
 

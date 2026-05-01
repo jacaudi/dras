@@ -115,3 +115,31 @@ def test_anonymous_mode_uses_unsigned_config() -> None:
 def test_volume_not_found_error_subclasses_s3_error() -> None:
     """VolumeNotFoundError must subclass S3Error so callers can catch the base."""
     assert issubclass(VolumeNotFoundError, S3Error)
+
+
+def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
+    """A slot mid-overwrite holds chunks from two distinct volumes.
+    Only the winning volume's chunks should be returned."""
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # Slot 9 holds two chunks of an older volume (12:00:00) and three
+        # chunks of a newer volume (12:05:00) that's mid-overwrite.
+        _put_chunk(s3, "KATX/9/20260429-120000-001-S", b"old-S")
+        _put_chunk(s3, "KATX/9/20260429-120000-002-I", b"old-I")
+        _put_chunk(s3, "KATX/9/20260429-120500-001-S", b"new-S")
+        _put_chunk(s3, "KATX/9/20260429-120500-002-I", b"new-I")
+        _put_chunk(s3, "KATX/9/20260429-120500-003-E", b"new-E")
+
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        assert v.volume_number == 9
+        assert v.chunk_keys == (
+            "KATX/9/20260429-120500-001-S",
+            "KATX/9/20260429-120500-002-I",
+            "KATX/9/20260429-120500-003-E",
+        )
+        # download_volume must produce only the new volume's payloads.
+        body = client.download_volume(v)
+        assert body == b"new-Snew-Inew-E"
