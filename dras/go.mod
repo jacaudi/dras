@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/gregdel/pushover v1.4.0
-	github.com/jacaudi/nws v0.1.0
+	github.com/jacaudi/nws v0.2.0
 	github.com/nikoksr/notify v1.5.0
 )
 
