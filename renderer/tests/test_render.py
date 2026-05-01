@@ -15,7 +15,7 @@ from dras_renderer.render import RenderOptions, render_base_reflectivity
 FIXTURE = Path(__file__).parent / "fixtures" / "KATX_test.ar2v.gz"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def decoded() -> DecodedScan:
     return decode_level2_archive(gzip.decompress(FIXTURE.read_bytes()))
 

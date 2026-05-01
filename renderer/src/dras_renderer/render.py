@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import math
 import os
 from dataclasses import dataclass
 
@@ -48,10 +49,13 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
         projection = ccrs.LambertConformal(central_latitude=lat, central_longitude=lon)
         ax = fig.add_subplot(1, 1, 1, projection=projection)
 
-        deg_per_km = 1.0 / 111.0
-        delta = opts.range_km * deg_per_km
+        # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
+        # cos(lat) correction the east-west extent stretches by 33% at KATX
+        # (lat ~48°) and ~50% at high-latitude AK stations.
+        delta_lat = opts.range_km / 111.0
+        delta_lon = delta_lat / max(math.cos(math.radians(lat)), 1e-6)
         ax.set_extent(
-            [lon - delta, lon + delta, lat - delta, lat + delta],
+            [lon - delta_lon, lon + delta_lon, lat - delta_lat, lat + delta_lat],
             crs=ccrs.PlateCarree(),
         )
 
@@ -68,7 +72,6 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
             vmin=opts.vmin,
             vmax=opts.vmax,
             cmap="pyart_NWSRef",
-            projection=projection,
             embellish=False,  # We add our own basemap features above.
         )
 
