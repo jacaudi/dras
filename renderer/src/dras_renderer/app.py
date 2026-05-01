@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import time
 from typing import cast
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
+from starlette.responses import Response
 
 from dras_renderer.cache import RenderCache
 from dras_renderer.config import Config
+from dras_renderer.metrics import REGISTRY, RENDER_DURATION, REQUESTS_TOTAL, S3_ERRORS_TOTAL
 from dras_renderer.s3 import S3Client
 from dras_renderer.service import (
     RenderRequest,
@@ -74,14 +78,21 @@ def build_app(config: Config | None = None) -> FastAPI:
             width=width,
             height=height,
         )
+        start = time.perf_counter()
         try:
             resp: RenderResponse = await asyncio.to_thread(svc.render, req)
         except ServiceError as exc:
+            REQUESTS_TOTAL.labels(outcome=f"error_{exc.code}").inc()
+            if exc.code == "internal":
+                S3_ERRORS_TOTAL.inc()
             raise HTTPException(
                 status_code=_STATUS_FOR_CODE.get(exc.code, 500),
                 detail={"error": exc.code, "detail": exc.detail},
             ) from exc
+        finally:
+            RENDER_DURATION.observe(time.perf_counter() - start)
 
+        REQUESTS_TOTAL.labels(outcome="ok").inc()
         return RenderEnvelope(
             image=base64.b64encode(resp.png).decode("ascii"),
             metadata=MetadataModel(
@@ -93,6 +104,10 @@ def build_app(config: Config | None = None) -> FastAPI:
                 renderer_version=resp.metadata.renderer_version,
             ),
         )
+
+    @app.get("/metrics")
+    async def metrics() -> Response:
+        return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
     @app.exception_handler(HTTPException)
     async def _http_exc_handler(_request: Request, exc: HTTPException) -> JSONResponse:
