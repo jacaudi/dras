@@ -152,7 +152,11 @@ class S3Client:
     def _list_keys(self, prefix: str) -> list[str]:
         keys: list[str] = []
         paginator = self._client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
-            for entry in page.get("Contents", []):
-                keys.append(entry["Key"])
+        try:
+            for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+                for entry in page.get("Contents", []):
+                    keys.append(entry["Key"])
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            raise S3Error(f"S3 list_objects_v2 failed on {prefix}: {code}") from e
         return keys

@@ -107,10 +107,10 @@ The renderer fetches volumes from `s3://unidata-nexrad-level2-chunks/`
 | env | default | meaning |
 |---|---|---|
 | `STATION_IDS` | required | Space/comma/semicolon-separated 4-letter NEXRAD station IDs (e.g. `KATX,KRAX`). |
-| `PUSHOVER_API_TOKEN` | required (unless `DRY_RUN=true`) | Pushover API token. |
-| `PUSHOVER_USER_KEY` | required (unless `DRY_RUN=true`) | Pushover user key. |
-| `CHECK_INTERVAL` | `5m` | Poll cadence per station. |
-| `DRY_RUN` | `false` | Disable Pushover; use test stations KATX/KRAX. |
+| `PUSHOVER_API_TOKEN` | required (unless `DRYRUN=true`) | Pushover API token. |
+| `PUSHOVER_USER_KEY` | required (unless `DRYRUN=true`) | Pushover user key. |
+| `INTERVAL` | `10` | Poll cadence in **minutes** (integer). |
+| `DRYRUN` | `false` | Disable Pushover; use test stations KATX/KRAX. |
 | `RENDERER_URL` | unset | **Advanced mode:** HTTP endpoint of `dras-renderer`. Empty → basic mode. |
 | `RENDERER_TIMEOUT` | `30s` | HTTP timeout for renderer calls. |
 | `RADAR_IMAGE_ENABLED` | `true` | **Basic mode:** enable/disable ridge image attach. Ignored in advanced mode. |
@@ -143,16 +143,12 @@ In advanced mode:
 In basic mode `dras` downloads `radar.weather.gov/ridge/standard/{station}_0.gif`
 directly.
 
-See [`docs/plans/`](./docs/plans/) for the design and implementation
-plan for the renderer split.
-
 ---
 
 ## Repository layout
 
 - [`dras/`](./dras/) — the Go service (orchestrator + Pushover notifier).
 - [`renderer/`](./renderer/) — the optional Python rendering service.
-- [`docs/plans/`](./docs/plans/) — design and implementation plans.
 - [`examples/`](./examples/) — Kubernetes deployment example.
 
 ---

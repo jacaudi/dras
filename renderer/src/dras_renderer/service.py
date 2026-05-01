@@ -74,7 +74,10 @@ class RenderService:
         # contention cost is dominated by the render itself (seconds), so the
         # serialization penalty is negligible.
         with self._render_lock:
-            volume = self._s3.latest_volume(req.station)
+            try:
+                volume = self._s3.latest_volume(req.station)
+            except S3Error as exc:
+                raise ServiceError("internal", f"S3 list failed: {exc}") from exc
             if volume is None:
                 raise ServiceError(
                     "no_recent_scan",

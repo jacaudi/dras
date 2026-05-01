@@ -78,6 +78,16 @@ func main() {
 	var imageSource image.Source
 	switch {
 	case cfg.RendererURL != "":
+		// Modes are mutually exclusive. If basic-mode settings were also
+		// configured, log a warning so operators don't silently rely on
+		// values that have no effect in advanced mode.
+		if cfg.RadarImageURLTmpl != "" || cfg.RadarImageRetention != 0 {
+			logger.WithFields(map[string]string{
+				"renderer_url":             cfg.RendererURL,
+				"radar_image_url_template": cfg.RadarImageURLTmpl,
+				"radar_image_retention":    cfg.RadarImageRetention.String(),
+			}).Info("RENDERER_URL is set; basic-mode RADAR_IMAGE_* settings are ignored")
+		}
 		imageSource = renderer.New(renderer.Config{
 			BaseURL:   cfg.RendererURL,
 			Timeout:   cfg.RendererTimeout,

@@ -25,6 +25,8 @@ func TestLoad(t *testing.T) {
 		"RADAR_IMAGE_ENABLED",
 		"RADAR_IMAGE_URL_TEMPLATE",
 		"RADAR_IMAGE_RETENTION",
+		"RENDERER_URL",
+		"RENDERER_TIMEOUT",
 	}
 
 	clearEnv := func(t *testing.T) {

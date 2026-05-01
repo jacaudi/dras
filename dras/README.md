@@ -12,7 +12,7 @@ For top-level project info see the [repo README](../README.md).
 ```bash
 cd dras
 go test -count=1 ./...
-PUSHOVER_API_TOKEN=x PUSHOVER_USER_KEY=x STATION_IDS=KATX DRY_RUN=true \
+PUSHOVER_API_TOKEN=x PUSHOVER_USER_KEY=x STATION_IDS=KATX DRYRUN=true \
   go run .
 ```
 
@@ -29,7 +29,7 @@ uv run dras-renderer
 ```bash
 # Terminal 2 — dras pointed at it
 cd dras
-PUSHOVER_API_TOKEN=x PUSHOVER_USER_KEY=x STATION_IDS=KATX DRY_RUN=true \
+PUSHOVER_API_TOKEN=x PUSHOVER_USER_KEY=x STATION_IDS=KATX DRYRUN=true \
   RENDERER_URL=http://127.0.0.1:8080 \
   go run .
 ```
@@ -41,7 +41,7 @@ Look for `Radar image source enabled [mode=advanced, ...]` in the logs.
 ```bash
 cd dras
 docker build --build-arg VERSION=v0.0.0-local -t dras:local .
-docker run --rm -e DRY_RUN=true -e STATION_IDS=KATX dras:local
+docker run --rm -e DRYRUN=true -e STATION_IDS=KATX dras:local
 ```
 
 ## Code layout

@@ -9,6 +9,18 @@ import uvicorn
 from dras_renderer.app import build_app
 from dras_renderer.config import Config
 
+_UVICORN_LEVELS = {"critical", "error", "warning", "info", "debug", "trace"}
+
+
+def _uvicorn_log_level(level: str) -> str:
+    """Normalize stdlib log-level aliases (e.g. WARN) to uvicorn's vocabulary."""
+    normalized = level.strip().lower()
+    if normalized == "warn":
+        normalized = "warning"
+    if normalized == "fatal":
+        normalized = "critical"
+    return normalized if normalized in _UVICORN_LEVELS else "info"
+
 
 def run() -> None:
     cfg = Config.from_env()
@@ -20,7 +32,7 @@ def run() -> None:
         build_app(),
         host="0.0.0.0",  # service is namespace-internal; not a public bind
         port=cfg.port,
-        log_level=cfg.log_level.lower(),
+        log_level=_uvicorn_log_level(cfg.log_level),
     )
 
 
