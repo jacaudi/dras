@@ -142,3 +142,29 @@ def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
         # download_volume must produce only the new volume's payloads, concatenated as-is.
         body = client.download_volume(v)
         assert body == b"new-S" + b"new-I" + b"new-E"
+
+
+def test_download_volume_concatenates_in_chunk_keys_order() -> None:
+    """Output bytes must be in chunk_keys order regardless of fetch completion order.
+
+    This is the correctness invariant of the parallel download path: a refactor
+    to ``as_completed`` (which yields by completion order) would break it.
+    """
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # 8 chunks with bodies that encode their chunk-num so order is verifiable.
+        for n in range(1, 9):
+            _put_chunk(s3, f"KATX/3/20260429-130000-00{n}-I", f"chunk-{n:02d}".encode())
+        client = S3Client(
+            bucket=BUCKET,
+            region="us-east-1",
+            anonymous=False,
+            list_workers=4,
+            download_workers=8,
+            latest_volume_ttl=0.0,
+        )
+        v = client.latest_volume("KATX")
+        assert v is not None
+        body = client.download_volume(v)
+        assert body == b"".join(f"chunk-{n:02d}".encode() for n in range(1, 9))
