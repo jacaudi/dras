@@ -2,6 +2,8 @@ package monitor
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -13,6 +15,7 @@ import (
 	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
+	"github.com/jacaudi/dras/internal/renderer"
 )
 
 func TestFetchRadarImageNilService(t *testing.T) {
@@ -266,5 +269,82 @@ func TestNonVCPChangeOmitsAttachment(t *testing.T) {
 	change := notifs[1]
 	if change.Attachment != nil {
 		t.Errorf("non-VCP change should not have attachment, got %+v", change.Attachment)
+	}
+}
+
+// TestRendererModeDeliversAttachment exercises the full happy path with the
+// renderer.Client image source. A renderer stub returns a unique PNG per
+// request so we can assert which body was attached.
+func TestRendererModeDeliversAttachment(t *testing.T) {
+	pngs := []string{"GIF1", "GIF2"} // intentionally not real PNGs; the contract is "bytes"
+	var imageRequests int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt64(&imageRequests, 1)
+		body := pngs[n-1]
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"image": base64.StdEncoding.EncodeToString([]byte(body)),
+			"metadata": map[string]any{
+				"station":          "KATX",
+				"product":          "base_reflectivity",
+				"scan_time":        "2026-04-26T15:32:00Z",
+				"elevation_deg":    0.5,
+				"vcp":              215,
+				"renderer_version": "v0.0.0-test",
+			},
+		})
+	}))
+	defer srv.Close()
+
+	rendererClient := renderer.New(renderer.Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	radarMock := radar.NewMockDataFetcher()
+	radarMock.SetResponse("KATX", &radar.Data{
+		Name: "Seattle", VCP: "R31", Mode: "Clear Air",
+		Status: "Online", OperabilityStatus: "Normal",
+		PowerSource: "Utility", GenState: "Off",
+	})
+
+	notifyMock := notify.NewMockNotifier()
+	cfg := &config.Config{
+		DryRun:        false,
+		CheckInterval: time.Minute,
+		AlertConfig:   radar.AlertConfig{VCP: true},
+	}
+
+	m := New(radarMock, notifyMock, rendererClient, cfg)
+	ctx := context.Background()
+
+	// First poll: startup notification with the freshly-rendered image.
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("first processStation: %v", err)
+	}
+	startup := notifyMock.GetNotifications()
+	if len(startup) != 1 || startup[0].Title != "DRAS Startup" {
+		t.Fatalf("expected startup notification, got %+v", startup)
+	}
+	if startup[0].Attachment == nil || string(startup[0].Attachment.Data) != "GIF1" {
+		t.Fatalf("startup attachment = %+v, want body 'GIF1'", startup[0].Attachment)
+	}
+
+	// VCP change.
+	radarMock.SetResponse("KATX", &radar.Data{
+		Name: "Seattle", VCP: "R12", Mode: "Precipitation",
+		Status: "Online", OperabilityStatus: "Normal",
+		PowerSource: "Utility", GenState: "Off",
+	})
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("second processStation: %v", err)
+	}
+	all := notifyMock.GetNotifications()
+	if len(all) != 2 {
+		t.Fatalf("expected 2 notifications, got %d", len(all))
+	}
+	change := all[1]
+	if change.Attachment == nil || string(change.Attachment.Data) != "GIF2" {
+		t.Fatalf("change attachment = %+v, want body 'GIF2'", change.Attachment)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 2 {
+		t.Errorf("expected 2 renderer requests, got %d", got)
 	}
 }
