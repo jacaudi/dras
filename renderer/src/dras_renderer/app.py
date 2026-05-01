@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from typing import cast
 
@@ -74,7 +75,7 @@ def build_app(config: Config | None = None) -> FastAPI:
             height=height,
         )
         try:
-            resp: RenderResponse = svc.render(req)
+            resp: RenderResponse = await asyncio.to_thread(svc.render, req)
         except ServiceError as exc:
             raise HTTPException(
                 status_code=_STATUS_FOR_CODE.get(exc.code, 500),
