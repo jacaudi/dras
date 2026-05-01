@@ -7,8 +7,13 @@ import math
 import os
 from dataclasses import dataclass
 
-# Headless backend MUST be selected before importing pyplot.
-os.environ.setdefault("MPLBACKEND", "Agg")
+# Headless backend MUST be selected before importing pyplot.  Use
+# matplotlib.use() (not just setdefault) so it wins even when the
+# macOS backend has already been detected by the env.
+os.environ["MPLBACKEND"] = "Agg"
+import matplotlib
+
+matplotlib.use("Agg")
 
 import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import cartopy.feature as cfeature  # type: ignore[import-untyped]
