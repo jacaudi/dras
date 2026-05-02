@@ -1,6 +1,6 @@
 ---
 # Pull Request Validation
-# Fast feedback on PRs: lint, test, and no-push container builds
+# Fast feedback on PRs: lint, test, helm validation
 name: PR Validation
 
 "on":
@@ -11,10 +11,47 @@ permissions:
   contents: read
   pull-requests: write
 
+# Cancel in-progress runs when a PR is force-pushed or new commits land.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
+  # Single paths-filter pass; downstream jobs `if:` on its outputs so an
+  # untouched language doesn't pay the runner-spinup cost.
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      dras: ${{ steps.filter.outputs.dras }}
+      renderer: ${{ steps.filter.outputs.renderer }}
+      chart: ${{ steps.filter.outputs.chart }}
+      yaml: ${{ steps.filter.outputs.yaml }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            dras:
+              - 'dras/**'
+              - 'go.mod'
+              - 'go.sum'
+            renderer:
+              - 'renderer/**'
+            chart:
+              - 'chart/**'
+              - 'scripts/sync-chart-version*.sh'
+              - '.releaserc.json'
+            yaml:
+              - '**/*.yml'
+              - '**/*.yaml'
+
   lint:
     name: Lint Code
-    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.1
+    needs: changes
+    if: needs.changes.outputs.dras == 'true' || needs.changes.outputs.yaml == 'true'
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.2
     with:
       yaml: true
       go: true
@@ -22,7 +59,9 @@ jobs:
 
   test:
     name: Run Tests
-    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.20.1
+    needs: changes
+    if: needs.changes.outputs.dras == 'true'
+    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.20.2
     with:
       test-framework: go
       coverage: true
@@ -31,7 +70,9 @@ jobs:
   # Python ruff via the central reusable lint workflow (mirrors the Go lint setup).
   lint-renderer-ruff:
     name: Lint Renderer (Ruff)
-    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.1
+    needs: changes
+    if: needs.changes.outputs.renderer == 'true'
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.2
     with:
       python: true
       working-directory: renderer
@@ -40,6 +81,8 @@ jobs:
   # Type-checking still uses uv since component-lint doesn't cover mypy.
   lint-renderer:
     name: Lint Renderer (Mypy)
+    needs: changes
+    if: needs.changes.outputs.renderer == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,6 +99,8 @@ jobs:
 
   test-renderer:
     name: Test Renderer
+    needs: changes
+    if: needs.changes.outputs.renderer == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -72,62 +117,45 @@ jobs:
 
   helm-validate:
     name: Validate Helm Chart
+    needs: changes
+    if: needs.changes.outputs.chart == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Detect chart changes
-        id: changes
-        uses: dorny/paths-filter@v3
-        with:
-          filters: |
-            chart:
-              - 'chart/**'
-              - 'scripts/sync-chart-version*.sh'
-              - '.releaserc.json'
-
       - name: Set up Helm
-        if: steps.changes.outputs.chart == 'true'
         uses: azure/setup-helm@v4
         with:
           version: v3.16.4
 
       - name: Install helm-unittest plugin
-        if: steps.changes.outputs.chart == 'true'
         run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
 
       - name: Install kubeconform
-        if: steps.changes.outputs.chart == 'true'
         run: |
           curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
             | sudo tar xz -C /usr/local/bin kubeconform
           kubeconform -v
 
       - name: Helm dependency update
-        if: steps.changes.outputs.chart == 'true'
         run: helm dependency update chart/
 
       - name: Helm lint (strict)
-        if: steps.changes.outputs.chart == 'true'
         run: helm lint chart/ --strict
 
       - name: helm-unittest
-        if: steps.changes.outputs.chart == 'true'
         run: helm unittest chart/
 
       - name: Helm template — standard mode | kubeconform
-        if: steps.changes.outputs.chart == 'true'
         run: |
           helm template dras chart/ -f chart/tests/values-standard.yaml --namespace monitoring \
             | kubeconform -strict -summary -kubernetes-version 1.30.0
 
       - name: Helm template — advanced mode | kubeconform
-        if: steps.changes.outputs.chart == 'true'
         run: |
           helm template dras chart/ -f chart/tests/values-advanced.yaml --namespace monitoring \
             | kubeconform -strict -summary -kubernetes-version 1.30.0
 
       - name: sync-chart-version.sh self-test
-        if: steps.changes.outputs.chart == 'true'
         run: bash scripts/sync-chart-version_test.sh
