@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 
 import boto3
 import pytest
-from botocore import UNSIGNED
 from moto import mock_aws
 
 from dras_renderer.s3 import (
@@ -104,11 +103,42 @@ def test_download_volume_raises_s3error_on_missing_chunk(mock_bucket: str) -> No
             client.download_volume(v)
 
 
-def test_anonymous_mode_uses_unsigned_config() -> None:
-    """When anonymous=True, the boto3 client is built with UNSIGNED."""
-    client = S3Client(bucket=BUCKET, region="us-east-1", anonymous=True)
-    cfg = client._client.meta.config
-    assert cfg.signature_version is UNSIGNED
+def test_anonymous_mode_uses_unsigned_requests() -> None:
+    """When anonymous=True, S3 requests must NOT carry an Authorization header.
+
+    This is a behavior-level check — it does not reach into private botocore
+    state. A regression that flipped the client to signed mode would be
+    caught here even if botocore's internal config layout changed.
+    """
+    captured: dict[str, dict[str, str]] = {}
+
+    def capture(**kwargs: object) -> None:
+        # botocore's `before-sign.s3` hook fires on every prepared request,
+        # including under moto. The request object exposes its headers as a
+        # case-insensitive mapping; coerce to plain dict for the assertion.
+        request = kwargs.get("request")
+        if request is not None:
+            captured["headers"] = dict(request.headers)  # type: ignore[attr-defined]
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+
+        client = S3Client(bucket=BUCKET, region="us-east-1", anonymous=True)
+        client._client.meta.events.register("before-sign.s3", capture)
+
+        # latest_volume issues paginated LIST calls; we don't care about the
+        # result (the bucket is empty), only that a real signed/unsigned LIST
+        # is dispatched so the before-sign hook captures its headers.
+        client.latest_volume("KATX")
+
+    headers = captured.get("headers")
+    assert headers is not None, "no request was captured by the before-sign.s3 hook"
+    # Header keys are case-insensitive in HTTP; normalize for the membership check.
+    lowered = {k.lower() for k in headers}
+    assert "authorization" not in lowered, (
+        f"anonymous client must not sign requests; got headers: {headers}"
+    )
 
 
 def test_volume_not_found_error_subclasses_s3_error() -> None:
