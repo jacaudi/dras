@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.7.0](https://github.com/jacaudi/dras/compare/v2.6.0...v2.7.0) (2026-05-02)
+
+### Bug Fixes
+
+* **chart:** restore stationIds pattern; pass un-prefixed version to helm-publish ([3dd5e21](https://github.com/jacaudi/dras/commit/3dd5e21dc18c242534acd1a38be846f56fca7be8))
+* **ci:** pin helm-unittest plugin to v1.0.3 (0.6.5 never existed) ([af10f13](https://github.com/jacaudi/dras/commit/af10f13c99de8d71817c3ac4fef35e767bacce61))
+* **dras:** plumb context.Context through image.Source.Fetch ([d558c2f](https://github.com/jacaudi/dras/commit/d558c2fd2beea064cc9ce8428fc519271bc2a933)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** assert anonymous S3 requests are unsigned via header inspection ([efbb10d](https://github.com/jacaudi/dras/commit/efbb10d437963da92023701cb57f5a1fb104e519)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** attribute S3 errors at service layer; type scan_time as datetime ([be37b90](https://github.com/jacaudi/dras/commit/be37b9083c2aee0911d41ecc2551efaef221d6e8)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** compare slot freshness on YYYYMMDD-HHMMSS prefix only ([fef13b2](https://github.com/jacaudi/dras/commit/fef13b20650cc287f730314fc0536db5d89305c6)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** document deviation from chunks/ fixture design ([ce5c943](https://github.com/jacaudi/dras/commit/ce5c943ca455212f97b70714773db8f2948432ba)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** document Dockerfile uv sync layering and verify cartopy cache at build ([f6dd64f](https://github.com/jacaudi/dras/commit/f6dd64fb7808113c7058191389e19bb8484cc7e2)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** drop redundant MPLBACKEND env var and document lowest-tilt sweep ([7958e8c](https://github.com/jacaudi/dras/commit/7958e8cb1cd2f043d7e146f7c3d6b6cb5206a000)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+* **renderer:** parallelize chunk downloads in download_volume ([78e9a12](https://github.com/jacaudi/dras/commit/78e9a129474f7a1ac9be0ebfe1ae72a60575a200)), closes [#85](https://github.com/jacaudi/dras/issues/85)
+
+
+### Features
+
+* **chart:** add values.schema.json and template fail clauses ([4a0750e](https://github.com/jacaudi/dras/commit/4a0750ec93741d14aca083c6fcc3d37c2f087696))
+* **chart:** scaffold helm chart with standard-mode dras-only render ([28e6393](https://github.com/jacaudi/dras/commit/28e639323943ff6b291bba925cea378b6ac5ffce))
+* **chart:** wire advanced mode — renderer service, RENDERER_URL, and S3 envs ([4f8d47f](https://github.com/jacaudi/dras/commit/4f8d47f89badeb65e9e0fd866f38960761354392))
+* **chart:** wire top-level image block as operator override surface ([78044de](https://github.com/jacaudi/dras/commit/78044de1d79dae24a06941e881c54a2e479e6b9b))
+* **release:** sync chart version with release tag via semantic-release ([86d2bdb](https://github.com/jacaudi/dras/commit/86d2bdb46d63b51ce79420ef6c2f633e1b511951))
+
 ## [2.6.0](https://github.com/jacaudi/dras/compare/v2.5.0...v2.6.0) (2026-05-01)
 
 ### Bug Fixes
