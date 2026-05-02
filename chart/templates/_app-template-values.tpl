@@ -14,6 +14,22 @@ common.Values typed nested maps into plain map[string]interface{} so that
 sprig set/unset/dig operate reliably on all nested keys.
 */}}
 {{- define "dras.appTemplateValues" -}}
+{{- /* Cross-field validation. JSON schema enforces shape; these clauses cover
+     conditional invariants that schema can't express cleanly. */ -}}
+{{- if not .Values.dras.stationIds -}}
+  {{- fail "dras.stationIds is required (e.g. \"KATX,KRAX\")" -}}
+{{- end -}}
+{{- if not .Values.dras.pushover.existingSecret -}}
+  {{- fail "dras.pushover.existingSecret is required (name of a Secret with PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY)" -}}
+{{- end -}}
+{{- if eq .Values.mode "advanced" -}}
+  {{- if not .Values.renderer.s3.bucket -}}
+    {{- fail "renderer.s3.bucket is required in advanced mode" -}}
+  {{- end -}}
+  {{- if not .Values.image.renderer.repository -}}
+    {{- fail "image.renderer.repository is required in advanced mode" -}}
+  {{- end -}}
+{{- end -}}
 {{- /* Round-trip through YAML to convert common.Values to plain maps */ -}}
 {{- $v := .Values | toYaml | fromYaml -}}
 

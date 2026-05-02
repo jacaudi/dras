@@ -14,25 +14,20 @@ tests:
       image.dras.tag: ""
       image.renderer.tag: ""
     asserts:
-      - documentIndex: 0
-        isKind:
-          of: Deployment
-      - documentIndex: 0
-        equal:
+      - documentSelector:
           path: metadata.name
           value: dras
-      - documentIndex: 0
+        isKind:
+          of: Deployment
+      - documentSelector:
+          path: metadata.name
+          value: dras
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras:v7\.7\.7$
-      - documentIndex: 1
-        isKind:
-          of: Deployment
-      - documentIndex: 1
-        equal:
-          path: metadata.name
-          value: dras-renderer
-      - documentIndex: 1
+      - documentSelector:
+          path: metadata.labels["app.kubernetes.io/controller"]
+          value: renderer
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
@@ -44,11 +39,15 @@ tests:
       image.dras.tag: v1.2.3-pinned
       image.renderer.tag: ""
     asserts:
-      - documentIndex: 0
+      - documentSelector:
+          path: metadata.name
+          value: dras
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras:v1\.2\.3-pinned$
-      - documentIndex: 1
+      - documentSelector:
+          path: metadata.labels["app.kubernetes.io/controller"]
+          value: renderer
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
@@ -61,7 +60,9 @@ tests:
       image.dras.tag: v0.1.0
       image.renderer.tag: ""
     asserts:
-      - documentIndex: 0
+      - documentSelector:
+          path: metadata.name
+          value: dras
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/myorg/dras-fork:v0\.1\.0$

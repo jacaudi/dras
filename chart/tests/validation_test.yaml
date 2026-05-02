@@ -1,0 +1,63 @@
+suite: validation
+templates:
+  - main.yaml
+release:
+  name: dras
+  namespace: default
+tests:
+  - it: rejects mode values outside the enum
+    set:
+      mode: experimental
+      dras.stationIds: KATX
+      dras.pushover.existingSecret: dras-pushover
+    asserts:
+      - failedTemplate:
+          errorPattern: "mode"
+
+  - it: requires dras.pushover.existingSecret to be non-empty
+    set:
+      mode: standard
+      dras.stationIds: KATX
+      dras.pushover.existingSecret: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "pushover.existingSecret"
+
+  - it: requires dras.stationIds to be non-empty
+    set:
+      mode: standard
+      dras.stationIds: ""
+      dras.pushover.existingSecret: dras-pushover
+    asserts:
+      - failedTemplate:
+          errorPattern: "stationIds"
+
+  - it: requires renderer.s3.bucket to be non-empty in advanced mode
+    set:
+      mode: advanced
+      dras.stationIds: KATX
+      dras.pushover.existingSecret: dras-pushover
+      renderer.s3.bucket: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "renderer.s3.bucket"
+
+  - it: requires image.renderer.repository to be non-empty in advanced mode
+    set:
+      mode: advanced
+      dras.stationIds: KATX
+      dras.pushover.existingSecret: dras-pushover
+      image.renderer.repository: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "image.renderer.repository"
+
+  - it: rejects unknown top-level keys (additionalProperties:false)
+    set:
+      mode: standard
+      dras.stationIds: KATX
+      dras.pushover.existingSecret: dras-pushover
+      unknownTopKey: oops
+    asserts:
+      - failedTemplate:
+          errorPattern: "unknownTopKey"
