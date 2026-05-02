@@ -125,7 +125,9 @@ jobs:
   # Package and push the OCI Helm chart at the same release version as the
   # container images. Runs in parallel with container-dras / container-renderer
   # — chart push doesn't depend on container builds (it references the images
-  # by tag only).
+  # by tag only). Pass the un-prefixed version (matches Chart.yaml's `version`
+  # field exactly); the reusable workflow adds the `v` prefix internally for
+  # the OCI tag and for the chart's `app-version`.
   helm-publish:
     needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
@@ -134,7 +136,7 @@ jobs:
       contents: read
       packages: write
     with:
-      version: ${{ needs.release.outputs.new-release-version-v }}
+      version: ${{ needs.release.outputs.new-release-version }}
     secrets: inherit
 
   pipeline-summary:

@@ -26,7 +26,8 @@
       "properties": {
         "stationIds": {
           "type": "string",
-          "description": "Comma-separated NEXRAD station IDs (4 uppercase letters each), e.g. 'KATX,KRAX'. Required at install time (enforced by template fail clause)."
+          "description": "Comma-separated NEXRAD station IDs (4 uppercase letters each), e.g. 'KATX,KRAX'. Required non-empty at install time (enforced by template fail clause). Pattern matches the empty string OR one or more comma-separated 4-uppercase-letter codes — empty is allowed at schema time so values.yaml can ship an empty default; the fail clause rejects empty at template time.",
+          "pattern": "^$|^[A-Z]{4}(,[A-Z]{4})*$"
         },
         "interval": {
           "type": ["string", "integer"],
