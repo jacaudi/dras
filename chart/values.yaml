@@ -5,10 +5,12 @@ mode: advanced  # one of: standard | advanced
 # Global overrides forwarded to bjw-s/common. Required by app-template's name helpers.
 global: {}
 
-# Image refs operator-facing surface. Currently UNUSED by Task 1 — the helper
-# reads image.{repository,tag,pullPolicy} from the per-controller blocks below.
-# Task 3 will wire this top-level block as the source of truth, defaulting
-# tag from .Chart.AppVersion when empty and writing through to controllers.
+# Container image refs. This is the operator-facing image-override surface:
+#   helm install --set image.dras.tag=v2.7.0 ...
+# Empty `tag` defaults to .Chart.AppVersion (the unified release tag).
+# The chart helper reads from here and writes through to controllers below;
+# do NOT set `image:` under controllers.<name>.containers.app — those are
+# overridden every render.
 image:
   dras:
     repository: ghcr.io/jacaudi/dras
@@ -53,13 +55,6 @@ controllers:
     replicas: 1
     containers:
       app:
-        # LIVE in Task 1 — this is the image read path until Task 3 wires
-        # the top-level image: block. Operators overriding image refs today
-        # must set controllers.dras.containers.app.image.<key>.
-        image:
-          repository: ghcr.io/jacaudi/dras
-          tag: ""                # "" => .Chart.AppVersion (defaulted by helper)
-          pullPolicy: IfNotPresent
         env: {}              # operator-supplied envs merge with chart-managed ones
         resources:
           requests: { cpu: 10m, memory: 32Mi }
@@ -74,13 +69,6 @@ controllers:
     replicas: 1
     containers:
       app:
-        # LIVE in Task 1 — this is the image read path until Task 3 wires
-        # the top-level image: block. Operators overriding image refs today
-        # must set controllers.renderer.containers.app.image.<key>.
-        image:
-          repository: ghcr.io/jacaudi/dras-renderer
-          tag: ""                # "" => .Chart.AppVersion (defaulted by helper)
-          pullPolicy: IfNotPresent
         ports:
           - name: http
             containerPort: 8080

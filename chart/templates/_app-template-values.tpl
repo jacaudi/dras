@@ -3,15 +3,11 @@ Build the values bag passed to bjw-s/app-template.
 
 Responsibilities of this helper:
   1. Strip the renderer controller/service in standard mode.
-  2. Default container image tags from .Chart.AppVersion when empty.
+  2. Inject container image refs from the top-level image: block, defaulting empty tag to .Chart.AppVersion.
   3. Inject Pushover envFrom on the dras container (always required).
   4. Append STATION_IDS / INTERVAL envs to the dras container.
   5. (Advanced mode only) Append RENDERER_URL on dras + S3_BUCKET/AWS_REGION on renderer. — added in Task 2
   6. (Schema enforcement) Fail clauses for required values. — added in Task 4
-
-Task 3 will replace responsibility 2 with a fuller implementation that reads
-from the top-level .Values.image.{dras,renderer}.{repository,tag,pullPolicy}
-block (currently dead in values.yaml) and writes through to controllers.
 
 Implementation note: the .Values | toYaml | fromYaml round-trip converts
 common.Values typed nested maps into plain map[string]interface{} so that
@@ -21,13 +17,23 @@ sprig set/unset/dig operate reliably on all nested keys.
 {{- /* Round-trip through YAML to convert common.Values to plain maps */ -}}
 {{- $v := .Values | toYaml | fromYaml -}}
 
-{{- /* Default container image tags from .Chart.AppVersion when empty.
-     Task 3 will replace this with a top-level .Values.image.* read path. */ -}}
-{{- $drasTag := .Values.controllers.dras.containers.app.image.tag | default .Chart.AppVersion -}}
-{{- $_ := set $v.controllers.dras.containers.app.image "tag" $drasTag -}}
+{{- /* Inject container image refs from the top-level .Values.image.{dras,renderer}.{repository,tag,pullPolicy}
+     surface, defaulting empty tag to .Chart.AppVersion. This is the operator-facing image-overrides path:
+     `helm install --set image.dras.tag=v2.7.0` pins the dras image. */ -}}
+{{- $drasImg := .Values.image.dras -}}
+{{- $drasTag := default .Chart.AppVersion $drasImg.tag -}}
+{{- $_ := set $v.controllers.dras.containers.app "image" (dict
+      "repository" $drasImg.repository
+      "tag" $drasTag
+      "pullPolicy" $drasImg.pullPolicy) -}}
+
 {{- if hasKey $v.controllers "renderer" -}}
-  {{- $rendererTag := .Values.controllers.renderer.containers.app.image.tag | default .Chart.AppVersion -}}
-  {{- $_ := set $v.controllers.renderer.containers.app.image "tag" $rendererTag -}}
+  {{- $rendImg := .Values.image.renderer -}}
+  {{- $rendTag := default .Chart.AppVersion $rendImg.tag -}}
+  {{- $_ := set $v.controllers.renderer.containers.app "image" (dict
+        "repository" $rendImg.repository
+        "tag" $rendTag
+        "pullPolicy" $rendImg.pullPolicy) -}}
 {{- end -}}
 
 {{- /* Strip renderer pieces in standard mode */ -}}
