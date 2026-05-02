@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import time
+from datetime import datetime
 from typing import cast
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -15,7 +16,7 @@ from starlette.responses import Response
 
 from dras_renderer.cache import RenderCache
 from dras_renderer.config import Config
-from dras_renderer.metrics import REGISTRY, RENDER_DURATION, REQUESTS_TOTAL, S3_ERRORS_TOTAL
+from dras_renderer.metrics import REGISTRY, RENDER_DURATION, REQUESTS_TOTAL
 from dras_renderer.s3 import S3Client
 from dras_renderer.service import (
     RenderRequest,
@@ -38,7 +39,7 @@ _STATUS_FOR_CODE: dict[str, int] = {
 class MetadataModel(BaseModel):
     station: str
     product: str
-    scan_time: str  # ISO-8601 UTC
+    scan_time: datetime  # Pydantic serializes datetime → ISO-8601 with TZ on dump.
     elevation_deg: float
     vcp: int
     renderer_version: str
@@ -83,8 +84,6 @@ def build_app(config: Config | None = None) -> FastAPI:
             resp: RenderResponse = await asyncio.to_thread(svc.render, req)
         except ServiceError as exc:
             REQUESTS_TOTAL.labels(outcome=f"error_{exc.code}").inc()
-            if exc.code == "internal":
-                S3_ERRORS_TOTAL.inc()
             raise HTTPException(
                 status_code=_STATUS_FOR_CODE.get(exc.code, 500),
                 detail={"error": exc.code, "detail": exc.detail},
@@ -98,7 +97,7 @@ def build_app(config: Config | None = None) -> FastAPI:
             metadata=MetadataModel(
                 station=resp.metadata.station,
                 product=resp.metadata.product,
-                scan_time=resp.metadata.scan_time.isoformat(),
+                scan_time=resp.metadata.scan_time,  # datetime; Pydantic emits ISO-8601.
                 elevation_deg=resp.metadata.elevation_deg,
                 vcp=resp.metadata.vcp,
                 renderer_version=resp.metadata.renderer_version,

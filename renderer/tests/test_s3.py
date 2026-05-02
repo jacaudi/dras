@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 
 import boto3
 import pytest
-from botocore import UNSIGNED
 from moto import mock_aws
 
 from dras_renderer.s3 import (
@@ -104,11 +103,42 @@ def test_download_volume_raises_s3error_on_missing_chunk(mock_bucket: str) -> No
             client.download_volume(v)
 
 
-def test_anonymous_mode_uses_unsigned_config() -> None:
-    """When anonymous=True, the boto3 client is built with UNSIGNED."""
-    client = S3Client(bucket=BUCKET, region="us-east-1", anonymous=True)
-    cfg = client._client.meta.config
-    assert cfg.signature_version is UNSIGNED
+def test_anonymous_mode_uses_unsigned_requests() -> None:
+    """When anonymous=True, S3 requests must NOT carry an Authorization header.
+
+    This is a behavior-level check — it does not reach into private botocore
+    state. A regression that flipped the client to signed mode would be
+    caught here even if botocore's internal config layout changed.
+    """
+    captured: dict[str, dict[str, str]] = {}
+
+    def capture(**kwargs: object) -> None:
+        # botocore's `before-sign.s3` hook fires on every prepared request,
+        # including under moto. The request object exposes its headers as a
+        # case-insensitive mapping; coerce to plain dict for the assertion.
+        request = kwargs.get("request")
+        if request is not None:
+            captured["headers"] = dict(request.headers)  # type: ignore[attr-defined]
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+
+        client = S3Client(bucket=BUCKET, region="us-east-1", anonymous=True)
+        client._client.meta.events.register("before-sign.s3", capture)
+
+        # latest_volume issues paginated LIST calls; we don't care about the
+        # result (the bucket is empty), only that a real signed/unsigned LIST
+        # is dispatched so the before-sign hook captures its headers.
+        client.latest_volume("KATX")
+
+    headers = captured.get("headers")
+    assert headers is not None, "no request was captured by the before-sign.s3 hook"
+    # Header keys are case-insensitive in HTTP; normalize for the membership check.
+    lowered = {k.lower() for k in headers}
+    assert "authorization" not in lowered, (
+        f"anonymous client must not sign requests; got headers: {headers}"
+    )
 
 
 def test_volume_not_found_error_subclasses_s3_error() -> None:
@@ -142,3 +172,59 @@ def test_latest_volume_filters_chunks_to_winning_timestamp() -> None:
         # download_volume must produce only the new volume's payloads, concatenated as-is.
         body = client.download_volume(v)
         assert body == b"new-S" + b"new-I" + b"new-E"
+
+
+def test_latest_volume_with_tied_prefixes_returns_a_valid_slot() -> None:
+    """Tie case: when two slots share the YYYYMMDD-HHMMSS prefix of their
+    newest chunk, the picker must return one of them deterministically and
+    return only that slot's chunks.
+
+    For well-formed NEXRAD filenames the prefix-only and full-filename
+    comparisons agree whenever timestamps differ (the prefix is the
+    leftmost varying field, so it dominates lex order). The two algorithms
+    can only disagree when prefixes tie — and even then, either slot is
+    a valid answer. This test pins the post-condition: the returned
+    chunk_keys belong to a single, real slot.
+    """
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # Same timestamp prefix; suffix differs across slots.
+        _put_chunk(s3, "KATX/5/20260429-120000-001-S", b"a")
+        _put_chunk(s3, "KATX/5/20260429-120000-002-I", b"b")
+        _put_chunk(s3, "KATX/5/20260429-120000-003-E", b"c")
+        _put_chunk(s3, "KATX/17/20260429-120000-001-S", b"x")
+        _put_chunk(s3, "KATX/17/20260429-120000-002-I", b"y")
+
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        assert v.volume_number in {5, 17}
+        assert all(k.startswith(f"KATX/{v.volume_number}/20260429-120000-") for k in v.chunk_keys)
+        assert v.latest_chunk_time == datetime(2026, 4, 29, 12, 0, 0, tzinfo=UTC)
+
+
+def test_download_volume_concatenates_in_chunk_keys_order() -> None:
+    """Output bytes must be in chunk_keys order regardless of fetch completion order.
+
+    This is the correctness invariant of the parallel download path: a refactor
+    to ``as_completed`` (which yields by completion order) would break it.
+    """
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # 8 chunks with bodies that encode their chunk-num so order is verifiable.
+        for n in range(1, 9):
+            _put_chunk(s3, f"KATX/3/20260429-130000-00{n}-I", f"chunk-{n:02d}".encode())
+        client = S3Client(
+            bucket=BUCKET,
+            region="us-east-1",
+            anonymous=False,
+            list_workers=4,
+            download_workers=8,
+            latest_volume_ttl=0.0,
+        )
+        v = client.latest_volume("KATX")
+        assert v is not None
+        body = client.download_volume(v)
+        assert body == b"".join(f"chunk-{n:02d}".encode() for n in range(1, 9))

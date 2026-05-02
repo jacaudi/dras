@@ -52,7 +52,7 @@ func TestFetchSendsUserAgentAndStores(t *testing.T) {
 		UserAgent:   ua,
 	})
 
-	img, err := svc.Fetch("KATX")
+	img, err := svc.Fetch(t.Context(), "KATX")
 	if err != nil {
 		t.Fatalf("Fetch() returned error: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestFetchAppendsHistoryAndPrunes(t *testing.T) {
 		{StationID: "KATX", FetchedAt: now.Add(-30 * time.Minute), Data: []byte("recent")},
 	}
 
-	if _, err := svc.Fetch("KATX"); err != nil {
+	if _, err := svc.Fetch(t.Context(), "KATX"); err != nil {
 		t.Fatalf("Fetch() returned error: %v", err)
 	}
 
@@ -137,7 +137,7 @@ func TestFetchReturnsErrorOnNon200(t *testing.T) {
 	defer server.Close()
 
 	svc := New(Config{URLTemplate: server.URL + "/{station}.gif"})
-	if _, err := svc.Fetch("KATX"); err == nil {
+	if _, err := svc.Fetch(t.Context(), "KATX"); err == nil {
 		t.Error("Fetch() expected error for 404 response, got nil")
 	}
 	if _, ok := svc.Latest("KATX"); ok {
@@ -147,7 +147,7 @@ func TestFetchReturnsErrorOnNon200(t *testing.T) {
 
 func TestFetchEmptyStationID(t *testing.T) {
 	svc := New(Config{})
-	if _, err := svc.Fetch(""); err == nil {
+	if _, err := svc.Fetch(t.Context(), ""); err == nil {
 		t.Error("Fetch(\"\") expected error, got nil")
 	}
 }

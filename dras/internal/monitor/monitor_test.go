@@ -21,7 +21,7 @@ import (
 func TestFetchRadarImageNilService(t *testing.T) {
 	m := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), nil, &config.Config{})
 
-	got := m.fetchRadarImage("KATX", logger.WithField("station", "KATX"))
+	got := m.fetchRadarImage(t.Context(), "KATX", logger.WithField("station", "KATX"))
 	if got != nil {
 		t.Errorf("fetchRadarImage() = %v, want nil when image service is nil", got)
 	}
@@ -36,7 +36,7 @@ func TestFetchRadarImageReturnsNilOnFailure(t *testing.T) {
 	imgSvc := image.New(image.Config{URLTemplate: server.URL + "/{station}.gif"})
 	m := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), imgSvc, &config.Config{})
 
-	got := m.fetchRadarImage("KATX", logger.WithField("station", "KATX"))
+	got := m.fetchRadarImage(t.Context(), "KATX", logger.WithField("station", "KATX"))
 	if got != nil {
 		t.Errorf("fetchRadarImage() = %v, want nil on HTTP failure", got)
 	}
@@ -55,7 +55,7 @@ func TestAttachmentForChange(t *testing.T) {
 	stationLogger := logger.WithField("station", "KATX")
 
 	t.Run("returns nil when VCP did not change", func(t *testing.T) {
-		fresh, err := imgSvc.Fetch("KATX")
+		fresh, err := imgSvc.Fetch(t.Context(), "KATX")
 		if err != nil {
 			t.Fatalf("Fetch() error: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestAttachmentForChange(t *testing.T) {
 	})
 
 	t.Run("returns attachment with fresh image when VCP changed", func(t *testing.T) {
-		fresh, err := imgSvc.Fetch("KATX")
+		fresh, err := imgSvc.Fetch(t.Context(), "KATX")
 		if err != nil {
 			t.Fatalf("Fetch() error: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestAttachmentForChange(t *testing.T) {
 
 	t.Run("returns nil when image service is disabled", func(t *testing.T) {
 		mNoImg := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), nil, &config.Config{})
-		fresh, err := imgSvc.Fetch("KATX")
+		fresh, err := imgSvc.Fetch(t.Context(), "KATX")
 		if err != nil {
 			t.Fatalf("Fetch() error: %v", err)
 		}

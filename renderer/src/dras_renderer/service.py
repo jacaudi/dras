@@ -10,6 +10,7 @@ from cachetools import LRUCache
 
 from dras_renderer.cache import RenderCache
 from dras_renderer.decode import DecodedScan, decode_level2_archive
+from dras_renderer.metrics import S3_ERRORS_TOTAL
 from dras_renderer.render import RenderOptions, render_base_reflectivity
 from dras_renderer.s3 import S3Client, S3Error
 from dras_renderer.version import VERSION
@@ -77,6 +78,7 @@ class RenderService:
             try:
                 volume = self._s3.latest_volume(req.station)
             except S3Error as exc:
+                S3_ERRORS_TOTAL.inc()
                 raise ServiceError("internal", f"S3 list failed: {exc}") from exc
             if volume is None:
                 raise ServiceError(
@@ -95,6 +97,7 @@ class RenderService:
             try:
                 volume_bytes = self._s3.download_volume(volume)
             except S3Error as exc:
+                S3_ERRORS_TOTAL.inc()
                 raise ServiceError("internal", f"S3 download failed: {exc}") from exc
 
             try:

@@ -39,6 +39,8 @@ def decode_level2_archive(volume_bytes: bytes) -> DecodedScan:
     """
     try:
         radar = pyart.io.read_nexrad_archive(io.BytesIO(volume_bytes))
+        # Py-ART sorts sweeps by ascending elevation, so index 0 is the
+        # lowest tilt — which is what the base-reflectivity render expects.
         return DecodedScan(
             radar=radar,
             station_id=_extract_station(radar),

@@ -1,8 +1,10 @@
 package renderer
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,7 +36,7 @@ func TestFetchHappyPath(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
-	img, err := c.Fetch("KATX")
+	img, err := c.Fetch(t.Context(), "KATX")
 	if err != nil {
 		t.Fatalf("Fetch: %v", err)
 	}
@@ -60,7 +62,7 @@ func TestFetchServerErrorReturnsError(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
-	_, err := c.Fetch("KATX")
+	_, err := c.Fetch(t.Context(), "KATX")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -76,7 +78,7 @@ func TestFetchTimeout(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Config{BaseURL: srv.URL, Timeout: 100 * time.Millisecond})
-	_, err := c.Fetch("KATX")
+	_, err := c.Fetch(t.Context(), "KATX")
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
@@ -90,7 +92,7 @@ func TestFetchMalformedBody(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
-	_, err := c.Fetch("KATX")
+	_, err := c.Fetch(t.Context(), "KATX")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -104,7 +106,7 @@ func TestFetchBadBase64(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
-	_, err := c.Fetch("KATX")
+	_, err := c.Fetch(t.Context(), "KATX")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -119,3 +121,28 @@ func TestLatestAlwaysReturnsFalse(t *testing.T) {
 
 // Compile-time check that *Client satisfies image.Source.
 var _ image.Source = (*Client)(nil)
+
+func TestFetchPropagatesContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	// Server blocks until its request context is cancelled, so the only way out
+	// is through ctx propagation.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+		http.Error(w, "ctx cancelled", http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel — ctx is already done before Fetch starts.
+
+	_, err := c.Fetch(ctx, "KATX")
+	if err == nil {
+		t.Fatal("expected error from cancelled ctx, got nil")
+	}
+	if !errors.Is(err, context.Canceled) && !strings.Contains(err.Error(), "context canceled") {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+}

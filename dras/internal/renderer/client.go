@@ -53,10 +53,10 @@ func New(cfg Config) *Client {
 	}
 }
 
-// Fetch retrieves the rendered image for the station.
-func (c *Client) Fetch(stationID string) (*image.Image, error) {
+// Fetch retrieves the rendered image for the station. The supplied ctx controls
+// the entire HTTP round-trip lifecycle.
+func (c *Client) Fetch(ctx context.Context, stationID string) (*image.Image, error) {
 	url := fmt.Sprintf("%s/render/%s", c.baseURL, stationID)
-	ctx := context.Background()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

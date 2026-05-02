@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import io
 import math
-import os
 from dataclasses import dataclass
 
-# Headless backend MUST be selected before importing pyplot.  Use
-# matplotlib.use() (not just setdefault) so it wins even when the
-# macOS backend has already been detected by the env.
-os.environ["MPLBACKEND"] = "Agg"
+# Headless backend MUST be selected before importing pyplot. ``matplotlib.use``
+# is authoritative — it overrides the env-var-based detection that runs at
+# import time. No need to also set MPLBACKEND in the process env: ``use`` wins.
 import matplotlib
 
 matplotlib.use("Agg")
@@ -68,6 +66,7 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
         ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
 
         display = pyart.graph.RadarMapDisplay(radar)
+        # sweep=0 == lowest tilt: Py-ART sorts sweeps by ascending elevation.
         display.plot_ppi_map(
             "reflectivity",
             sweep=0,

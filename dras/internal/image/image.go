@@ -3,6 +3,7 @@
 package image
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -45,8 +46,9 @@ type Image struct {
 // Source supplies radar images for stations. Implementations decide where
 // images come from (downloaded GIFs, rendered Level II data, etc).
 type Source interface {
-	// Fetch returns the latest image for the station.
-	Fetch(stationID string) (*Image, error)
+	// Fetch returns the latest image for the station. The context controls
+	// the entire fetch lifecycle, including any HTTP round-trip.
+	Fetch(ctx context.Context, stationID string) (*Image, error)
 	// Latest returns the most recent successful image for the station, if
 	// any is still within the implementation's retention window.
 	Latest(stationID string) (*Image, bool)
@@ -120,8 +122,9 @@ func (s *Service) URLFor(stationID string) string {
 
 // Fetch downloads the radar image for the station, appends it to the per
 // -station history, prunes images outside the retention window, and returns
-// the freshly downloaded image so callers can use it immediately.
-func (s *Service) Fetch(stationID string) (*Image, error) {
+// the freshly downloaded image so callers can use it immediately. The
+// supplied ctx controls the HTTP round-trip lifecycle.
+func (s *Service) Fetch(ctx context.Context, stationID string) (*Image, error) {
 	if stationID == "" {
 		return nil, errors.New("stationID cannot be empty")
 	}
@@ -132,7 +135,7 @@ func (s *Service) Fetch(stationID string) (*Image, error) {
 		"url":     url,
 	}).Debug("Fetching radar image")
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error building radar image request for %s: %w", stationID, err)
 	}

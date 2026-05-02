@@ -67,11 +67,15 @@ class S3Client:
         region: str,
         anonymous: bool = True,
         list_workers: int = 64,
+        download_workers: int | None = None,
         latest_volume_ttl: float = 30.0,
     ) -> None:
         self.bucket = bucket
         self.region = region
         self.list_workers = list_workers
+        # Default download concurrency to list_workers — the boto3 client's
+        # max_pool_connections=64 caps real parallelism regardless.
+        self.download_workers = download_workers if download_workers is not None else list_workers
         self.latest_volume_ttl = latest_volume_ttl
         self._client: Any = boto3.client(
             "s3", region_name=region, config=_make_config(anonymous)
@@ -105,17 +109,24 @@ class S3Client:
         with ThreadPoolExecutor(max_workers=self.list_workers) as executor:
             results = list(executor.map(chunks_for, VOLUME_SLOTS))
 
+        # ``sorted(keys)`` orders chunks by lex; chunk filenames are
+        # ``<YYYYMMDD-HHMMSS>-<NNN>-<TYPE>``, where the chunk-num field is
+        # zero-padded to 3 digits. Within a single volume's keys this makes
+        # lex order == chronological / chunk-num order. If NOAA ever drops
+        # the zero-pad, parse the chunk-num explicitly via ``int(name.rsplit("-", 2)[-2])``.
         non_empty = [(v, sorted(keys)) for v, keys in results if keys]
         if not non_empty:
             return None
 
-        # The volume with the largest "newest chunk filename" wins.
-        # Compare on the filename only (after last '/') so that slot numbers
-        # like 5 vs 17 don't distort the lex comparison — only the
-        # YYYYMMDD-HHMMSS prefix in the filename determines recency.
-        best_vol, best_chunks = max(non_empty, key=lambda item: item[1][-1].rsplit("/", 1)[-1])
-        latest_filename = best_chunks[-1].rsplit("/", 1)[-1]
-        ts_prefix = latest_filename[:15]  # "YYYYMMDD-HHMMSS"
+        # Compare slots only on the YYYYMMDD-HHMMSS prefix of the newest
+        # filename — defensive against future drift in the chunk-num/type
+        # suffix format (e.g. a per-tilt suffix change). The volume start
+        # timestamp is what determines recency.
+        def prefix_key(item: tuple[int, list[str]]) -> str:
+            return item[1][-1].rsplit("/", 1)[-1][:15]
+
+        best_vol, best_chunks = max(non_empty, key=prefix_key)
+        ts_prefix = prefix_key((best_vol, best_chunks))  # "YYYYMMDD-HHMMSS"
         # Slots are reused (volume IDs cycle 0-999). A slot mid-overwrite can hold
         # chunks from two distinct volumes; keep only the winning volume's chunks.
         volume_chunks = tuple(
@@ -131,23 +142,37 @@ class S3Client:
         )
 
     def download_volume(self, volume: LatestVolume) -> bytes:
-        """Fetch all chunks for ``volume`` and concatenate them in chunk-num order.
+        """Fetch all chunks for ``volume`` concurrently and concatenate them in chunk-num order.
 
         The result is a Level II Archive blob byte-identical to a ``_V06`` file:
         ``[AR2V volume header from chunk 1][LDM-record-framed bzip2 streams from
         every chunk]``. Py-ART's ``read_nexrad_archive`` handles the per-record
         bzip2 decompression itself; we must NOT decompress at this layer.
+
+        Concurrency: chunks are fetched in parallel via a ThreadPoolExecutor sized
+        to ``self.download_workers``; the caller-visible byte order matches
+        ``volume.chunk_keys`` (chunk-num order), independent of fetch completion
+        order.
         """
-        chunk_bodies: list[bytes] = []
-        for key in volume.chunk_keys:
+        def fetch_one(key: str) -> bytes:
             try:
                 resp = self._client.get_object(Bucket=self.bucket, Key=key)
             except ClientError as e:
                 code = e.response.get("Error", {}).get("Code", "")
                 raise S3Error(f"S3 get_object failed on {key}: {code}") from e
-            chunk_bodies.append(cast(bytes, resp["Body"].read()))
+            return cast(bytes, resp["Body"].read())
 
-        return b"".join(chunk_bodies)
+        if not volume.chunk_keys:
+            return b""
+
+        with ThreadPoolExecutor(max_workers=self.download_workers) as executor:
+            # executor.map preserves input order in its output, so the join below
+            # produces chunks in chunk-num (== input) order regardless of fetch
+            # completion order. ClientError raised inside fetch_one is wrapped in
+            # S3Error and propagated when its result is consumed below.
+            bodies = list(executor.map(fetch_one, volume.chunk_keys))
+
+        return b"".join(bodies)
 
     def _list_keys(self, prefix: str) -> list[str]:
         keys: list[str] = []
