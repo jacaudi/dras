@@ -28,8 +28,18 @@ jobs:
       coverage: true
       working-directory: dras
 
+  # Python ruff via the central reusable lint workflow (mirrors the Go lint setup).
+  lint-renderer-ruff:
+    name: Lint Renderer (Ruff)
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.1
+    with:
+      python: true
+      working-directory: renderer
+      ruff-args: src tests
+
+  # Type-checking still uses uv since component-lint doesn't cover mypy.
   lint-renderer:
-    name: Lint Renderer
+    name: Lint Renderer (Mypy)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,8 +51,6 @@ jobs:
           version: "0.5.x"
       - name: Sync deps
         run: uv sync --frozen
-      - name: Ruff
-        run: uv run ruff check src tests
       - name: Mypy
         run: uv run mypy src
 
@@ -61,99 +69,6 @@ jobs:
         run: uv sync --frozen
       - name: Pytest
         run: uv run pytest -v
-
-  # Validate Dockerfile builds for both architectures (no push)
-  container-amd64:
-    name: Build Container (amd64)
-    needs: [lint, test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build (amd64)
-        uses: docker/build-push-action@v7
-        with:
-          context: dras
-          file: dras/Dockerfile
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: dras:pr-${{ github.event.pull_request.number }}-amd64
-          cache-from: type=gha,scope=amd64
-          cache-to: type=gha,mode=max,scope=amd64
-
-  container-arm64:
-    name: Build Container (arm64)
-    needs: [lint, test]
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build (arm64)
-        uses: docker/build-push-action@v7
-        with:
-          context: dras
-          file: dras/Dockerfile
-          platforms: linux/arm64
-          push: false
-          load: true
-          tags: dras:pr-${{ github.event.pull_request.number }}-arm64
-          cache-from: type=gha,scope=arm64
-          cache-to: type=gha,mode=max,scope=arm64
-
-  container-renderer-amd64:
-    name: Build Renderer Container (amd64)
-    needs: [lint-renderer, test-renderer]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build (amd64)
-        uses: docker/build-push-action@v7
-        with:
-          context: renderer
-          file: renderer/Dockerfile
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: dras-renderer:pr-${{ github.event.pull_request.number }}-amd64
-          cache-from: type=gha,scope=renderer-amd64
-          cache-to: type=gha,mode=max,scope=renderer-amd64
-
-  container-renderer-arm64:
-    name: Build Renderer Container (arm64)
-    needs: [lint-renderer, test-renderer]
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build (arm64)
-        uses: docker/build-push-action@v7
-        with:
-          context: renderer
-          file: renderer/Dockerfile
-          platforms: linux/arm64
-          push: false
-          load: true
-          tags: dras-renderer:pr-${{ github.event.pull_request.number }}-arm64
-          cache-from: type=gha,scope=renderer-arm64
-          cache-to: type=gha,mode=max,scope=renderer-arm64
 
   helm-validate:
     name: Validate Helm Chart
