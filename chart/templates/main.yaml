@@ -1,0 +1,3 @@
+{{- $values := include "dras.appTemplateValues" . | fromYaml -}}
+{{- $ctx := dict "Chart" .Chart "Release" .Release "Values" $values "Files" .Files "Capabilities" .Capabilities "Template" .Template -}}
+{{- include "bjw-s.common.loader.all" $ctx -}}

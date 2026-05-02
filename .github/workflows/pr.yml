@@ -154,3 +154,65 @@ jobs:
           tags: dras-renderer:pr-${{ github.event.pull_request.number }}-arm64
           cache-from: type=gha,scope=renderer-arm64
           cache-to: type=gha,mode=max,scope=renderer-arm64
+
+  helm-validate:
+    name: Validate Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect chart changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            chart:
+              - 'chart/**'
+              - 'scripts/sync-chart-version*.sh'
+              - '.releaserc.json'
+
+      - name: Set up Helm
+        if: steps.changes.outputs.chart == 'true'
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Install helm-unittest plugin
+        if: steps.changes.outputs.chart == 'true'
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
+
+      - name: Install kubeconform
+        if: steps.changes.outputs.chart == 'true'
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      - name: Helm dependency update
+        if: steps.changes.outputs.chart == 'true'
+        run: helm dependency update chart/
+
+      - name: Helm lint (strict)
+        if: steps.changes.outputs.chart == 'true'
+        run: helm lint chart/ --strict
+
+      - name: helm-unittest
+        if: steps.changes.outputs.chart == 'true'
+        run: helm unittest chart/
+
+      - name: Helm template — standard mode | kubeconform
+        if: steps.changes.outputs.chart == 'true'
+        run: |
+          helm template dras chart/ -f chart/tests/values-standard.yaml --namespace monitoring \
+            | kubeconform -strict -summary -kubernetes-version 1.30.0
+
+      - name: Helm template — advanced mode | kubeconform
+        if: steps.changes.outputs.chart == 'true'
+        run: |
+          helm template dras chart/ -f chart/tests/values-advanced.yaml --namespace monitoring \
+            | kubeconform -strict -summary -kubernetes-version 1.30.0
+
+      - name: sync-chart-version.sh self-test
+        if: steps.changes.outputs.chart == 'true'
+        run: bash scripts/sync-chart-version_test.sh

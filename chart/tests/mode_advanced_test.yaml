@@ -1,0 +1,61 @@
+suite: mode advanced
+templates:
+  - main.yaml
+release:
+  name: dras
+  namespace: monitoring
+chart:
+  appVersion: v9.9.9
+values:
+  - values-advanced.yaml
+tests:
+  - it: renders 1 Service and 2 Deployments (3 docs total)
+    asserts:
+      - hasDocuments:
+          count: 3
+
+  - it: dras container has RENDERER_URL pointing at the renderer Service
+    documentSelector:
+      path: metadata.name
+      value: dras
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RENDERER_URL
+            value: http://dras-renderer.monitoring.svc.cluster.local:8080
+
+  - it: renderer Deployment container env has S3_BUCKET and AWS_REGION
+    documentSelector:
+      path: metadata.labels["app.kubernetes.io/controller"]
+      value: renderer
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: S3_BUCKET
+            value: unidata-nexrad-level2-chunks
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AWS_REGION
+            value: us-east-1
+
+  - it: renderer Service is ClusterIP on port 8080
+    documentSelector:
+      path: kind
+      value: Service
+    asserts:
+      - equal:
+          path: metadata.name
+          value: dras-renderer
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0].port
+          value: 8080

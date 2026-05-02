@@ -1,0 +1,6 @@
+mode: advanced
+dras:
+  stationIds: KATX,KRAX
+  interval: "10"
+  pushover:
+    existingSecret: dras-pushover

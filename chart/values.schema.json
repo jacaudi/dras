@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dras Helm chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode", "image", "dras", "renderer"],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["standard", "advanced"],
+      "description": "Deployment mode. 'standard' = dras only. 'advanced' = dras + renderer."
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dras", "renderer"],
+      "properties": {
+        "dras":     { "$ref": "#/$defs/imageRef" },
+        "renderer": { "$ref": "#/$defs/imageRef" }
+      }
+    },
+    "dras": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stationIds", "interval", "pushover"],
+      "properties": {
+        "stationIds": {
+          "type": "string",
+          "description": "Comma-separated NEXRAD station IDs (4 uppercase letters each), e.g. 'KATX,KRAX'. Required non-empty at install time (enforced by template fail clause). Pattern matches the empty string OR one or more comma-separated 4-uppercase-letter codes — empty is allowed at schema time so values.yaml can ship an empty default; the fail clause rejects empty at template time.",
+          "pattern": "^$|^[A-Z]{4}(,[A-Z]{4})*$"
+        },
+        "interval": {
+          "type": ["string", "integer"],
+          "description": "Poll interval in minutes."
+        },
+        "pushover": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["existingSecret"],
+          "properties": {
+            "existingSecret": {
+              "type": "string",
+              "description": "Name of an existing Secret containing PUSHOVER_API_TOKEN and PUSHOVER_USER_KEY. Required at install time (enforced by template fail clause)."
+            }
+          }
+        }
+      }
+    },
+    "renderer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "s3"],
+      "properties": {
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["port"],
+          "properties": {
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "s3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["bucket", "region"],
+          "properties": {
+            "bucket": { "type": "string", "minLength": 1 },
+            "region": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "global":            { "type": "object", "additionalProperties": true },
+    "defaultPodOptions": { "type": "object", "additionalProperties": true },
+    "controllers":       { "type": "object", "additionalProperties": true },
+    "service":           { "type": "object", "additionalProperties": true },
+    "serviceAccount":    { "type": "object", "additionalProperties": true },
+    "rbac":              { "type": "object", "additionalProperties": true },
+    "persistence":       { "type": "object", "additionalProperties": true },
+    "ingress":           { "type": "object", "additionalProperties": true },
+    "route":             { "type": "object", "additionalProperties": true },
+    "configMaps":        { "type": "object", "additionalProperties": true },
+    "secrets":           { "type": "object", "additionalProperties": true },
+    "networkpolicies":   { "type": "object", "additionalProperties": true },
+    "rawResources":      { "type": "object", "additionalProperties": true },
+    "serviceMonitor":    { "type": "object", "additionalProperties": true },
+    "app-template":      { "type": "object", "additionalProperties": true,
+                           "description": "Internal — subchart values injected by Helm; do not set directly." }
+  },
+  "$defs": {
+    "imageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag":        { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["IfNotPresent", "Always", "Never"] }
+      }
+    }
+  }
+}

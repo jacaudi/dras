@@ -1,0 +1,17 @@
+Thanks for installing dras chart {{ .Chart.Version }} (app version {{ .Chart.AppVersion }}).
+
+Mode: {{ .Values.mode }}
+
+{{- if eq .Values.mode "advanced" }}
+
+dras → renderer wiring:
+  RENDERER_URL = http://{{ .Release.Name }}-renderer.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.renderer.service.port }}
+
+{{- end }}
+
+Required Secret (must exist before install):
+  Name : {{ .Values.dras.pushover.existingSecret }}
+  Keys : PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY
+
+Watch the rollout:
+  kubectl --namespace {{ .Release.Namespace }} rollout status -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/controller=dras deployment

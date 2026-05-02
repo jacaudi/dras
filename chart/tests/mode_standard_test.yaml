@@ -1,0 +1,50 @@
+suite: mode standard
+templates:
+  - main.yaml
+release:
+  name: dras
+  namespace: monitoring
+chart:
+  appVersion: v9.9.9
+values:
+  - values-standard.yaml
+tests:
+  - it: renders exactly one Deployment for dras
+    asserts:
+      - hasDocuments: { count: 1 }
+      - documentIndex: 0
+        isKind:
+          of: Deployment
+      - documentIndex: 0
+        equal:
+          path: metadata.name
+          value: dras
+
+  - it: dras container envFrom references the Pushover secret
+    asserts:
+      - documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: dras-pushover
+
+  - it: dras container env carries STATION_IDS and INTERVAL but no RENDERER_URL
+    asserts:
+      - documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: STATION_IDS
+            value: "KATX,KRAX"
+      - documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: INTERVAL
+            value: "10"
+      - documentIndex: 0
+        notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RENDERER_URL

@@ -1,0 +1,68 @@
+suite: image tag defaults to Chart.AppVersion
+templates:
+  - main.yaml
+release:
+  name: dras
+  namespace: monitoring
+chart:
+  appVersion: v7.7.7
+tests:
+  - it: dras image tag defaults to AppVersion when image.dras.tag is empty
+    values:
+      - values-advanced.yaml
+    set:
+      image.dras.tag: ""
+      image.renderer.tag: ""
+    asserts:
+      - documentSelector:
+          path: metadata.name
+          value: dras
+        isKind:
+          of: Deployment
+      - documentSelector:
+          path: metadata.name
+          value: dras
+        matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/jacaudi/dras:v7\.7\.7$
+      - documentSelector:
+          path: metadata.labels["app.kubernetes.io/controller"]
+          value: renderer
+        matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
+
+  - it: explicit image.dras.tag override is honored, renderer still defaults
+    values:
+      - values-advanced.yaml
+    set:
+      image.dras.tag: v1.2.3-pinned
+      image.renderer.tag: ""
+    asserts:
+      - documentSelector:
+          path: metadata.name
+          value: dras
+        matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/jacaudi/dras:v1\.2\.3-pinned$
+      - documentSelector:
+          path: metadata.labels["app.kubernetes.io/controller"]
+          value: renderer
+        matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
+
+  - it: explicit image.dras.repository override is honored
+    values:
+      - values-advanced.yaml
+    set:
+      image.dras.repository: ghcr.io/myorg/dras-fork
+      image.dras.tag: v0.1.0
+      image.renderer.tag: ""
+    asserts:
+      - documentSelector:
+          path: metadata.name
+          value: dras
+        matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/myorg/dras-fork:v0\.1\.0$

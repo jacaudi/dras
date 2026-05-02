@@ -1,0 +1,121 @@
+# Headline mode toggle. Drives whether renderer resources are rendered
+# and whether RENDERER_URL is injected into dras' env.
+mode: advanced  # one of: standard | advanced
+
+# Global overrides forwarded to bjw-s/common. Required by app-template's name helpers.
+global: {}
+
+# Container image refs. This is the operator-facing image-override surface:
+#   helm install --set image.dras.tag=v2.7.0 ...
+# Empty `tag` defaults to .Chart.AppVersion (the unified release tag).
+# The chart helper reads from here and writes through to controllers below;
+# do NOT set `image:` under controllers.<name>.containers.app — those are
+# overridden every render.
+image:
+  dras:
+    repository: ghcr.io/jacaudi/dras
+    tag: ""                  # "" => .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  renderer:
+    repository: ghcr.io/jacaudi/dras-renderer
+    tag: ""                  # "" => .Chart.AppVersion
+    pullPolicy: IfNotPresent
+
+# dras-specific config.
+dras:
+  stationIds: ""             # required; e.g. "KATX,KRAX"
+  interval: "10"             # poll interval in minutes
+
+  # Pushover credentials. Reference-only — chart never creates this Secret.
+  # Required keys in the Secret: PUSHOVER_API_TOKEN, PUSHOVER_USER_KEY.
+  pushover:
+    existingSecret: ""       # required; e.g. "dras-pushover"
+
+# Renderer-specific config. Read in advanced mode; ignored in standard mode.
+# The renderer always uses anonymous (UNSIGNED) S3 access in v1; no AWS-creds
+# values surface today (renderer/src/dras_renderer/app.py hardcodes it).
+renderer:
+  service:
+    port: 8080               # internal service port; not exposed via Ingress
+  s3:
+    bucket: unidata-nexrad-level2-chunks  # passed as S3_BUCKET env
+    region: us-east-1                     # passed as AWS_REGION env
+
+# ── Pass-through overrides into bjw-s app-template ───────────────────────
+defaultPodOptions:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+
+controllers:
+  dras:
+    replicas: 1
+    containers:
+      app:
+        env: {}              # operator-supplied envs merge with chart-managed ones
+        resources:
+          requests: { cpu: 10m, memory: 32Mi }
+          limits:   { memory: 64Mi }
+        probes:
+          liveness:  { enabled: false }
+          readiness: { enabled: false }
+          startup:   { enabled: false }
+
+  renderer:
+    # Stripped before app-template sees values when mode == standard.
+    replicas: 1
+    containers:
+      app:
+        ports:
+          - name: http
+            containerPort: 8080
+        resources:
+          requests: { cpu: 100m, memory: 384Mi }
+          limits:   { memory: 768Mi }
+        probes:
+          liveness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet: { path: /healthz, port: 8080 }
+              initialDelaySeconds: 10
+              periodSeconds: 30
+          readiness:
+            enabled: true
+            custom: true
+            spec:
+              httpGet: { path: /healthz, port: 8080 }
+              periodSeconds: 10
+
+service:
+  # Stripped before app-template sees values when mode == standard.
+  # suffix: renderer causes bjw-s common to append "-renderer" to the
+  # fullname ("dras"), producing "dras-renderer". Without this, a single-
+  # service chart skips appending the identifier and the Service would be
+  # named "dras" — mismatching the RENDERER_URL DNS name injected by the
+  # _app-template-values.tpl helper.
+  renderer:
+    controller: renderer
+    type: ClusterIP
+    suffix: renderer
+    ports:
+      http:
+        port: 8080
+        protocol: HTTP
+
+# ── app-template required top-level stubs ────────────────────────────────
+# app-template/common iterates these keys directly; they must be present as
+# empty maps (not nil) so that range/get operations do not dereference nil.
+configMaps: {}
+ingress: {}
+networkpolicies: {}
+persistence: {}
+rawResources: {}
+rbac: {}
+route: {}
+secrets: {}
+serviceAccount: {}
+serviceMonitor: {}
