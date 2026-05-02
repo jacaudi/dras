@@ -60,7 +60,16 @@ services:
 
 ### Kubernetes
 
-Two Deployments + one Service for the renderer. Helm via [bjw-s `app-template`](https://github.com/bjw-s/helm-charts/tree/main/charts/other/app-template) is the conventional pattern in this org; a project-owned chart is tracked in the issue tracker.
+Two Deployments + one Service for the renderer. Use the [project-owned Helm chart](../chart/README.md) for both standard and advanced modes:
+
+```bash
+helm install dras oci://ghcr.io/jacaudi/charts/dras --version vX.Y.Z \
+  --namespace monitoring --create-namespace \
+  --set dras.stationIds=KATX,KRAX \
+  --set dras.pushover.existingSecret=dras-pushover
+```
+
+The chart's [README](../chart/README.md) has the full values reference and Pushover Secret setup. For a hand-rolled deployment, [`examples/kubernetes.yaml`](../examples/kubernetes.yaml) is still maintained.
 
 Networking notes:
 
