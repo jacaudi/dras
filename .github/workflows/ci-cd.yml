@@ -92,6 +92,11 @@ jobs:
       file: dras/Dockerfile
       platforms: linux/amd64,linux/arm64
       push: true
+      # dras is a static Go binary; the Dockerfile cross-compiles via
+      # GOOS/GOARCH, so the arm64 build doesn't need a native arm runner
+      # (no QEMU emulation runs at the Go layer either). Forcing the
+      # arm64 build to amd64 saves ~20s of arm-runner provisioning.
+      arm64-runner: ubuntu-24.04
       version: ${{ needs.release.outputs.new-release-version-v }}
       tags: |
         ghcr.io/${{ github.repository }}:latest
