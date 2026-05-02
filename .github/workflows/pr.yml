@@ -28,8 +28,18 @@ jobs:
       coverage: true
       working-directory: dras
 
+  # Python ruff via the central reusable lint workflow (mirrors the Go lint setup).
+  lint-renderer-ruff:
+    name: Lint Renderer (Ruff)
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.1
+    with:
+      python: true
+      working-directory: renderer
+      ruff-args: src tests
+
+  # Type-checking still uses uv since component-lint doesn't cover mypy.
   lint-renderer:
-    name: Lint Renderer
+    name: Lint Renderer (Mypy)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,8 +51,6 @@ jobs:
           version: "0.5.x"
       - name: Sync deps
         run: uv sync --frozen
-      - name: Ruff
-        run: uv run ruff check src tests
       - name: Mypy
         run: uv run mypy src
 
@@ -111,7 +119,7 @@ jobs:
 
   container-renderer-amd64:
     name: Build Renderer Container (amd64)
-    needs: [lint-renderer, test-renderer]
+    needs: [lint-renderer, lint-renderer-ruff, test-renderer]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -134,7 +142,7 @@ jobs:
 
   container-renderer-arm64:
     name: Build Renderer Container (arm64)
-    needs: [lint-renderer, test-renderer]
+    needs: [lint-renderer, lint-renderer-ruff, test-renderer]
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
