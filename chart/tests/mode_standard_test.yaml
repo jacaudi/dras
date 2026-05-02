@@ -48,3 +48,20 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: RENDERER_URL
+
+  - it: standard mode dras pod mounts /tmp from emptyDir at subPath dras
+    asserts:
+      - documentIndex: 0
+        contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            mountPath: /tmp
+            name: tmp
+            subPath: dras
+      - documentIndex: 0
+        contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 256Mi

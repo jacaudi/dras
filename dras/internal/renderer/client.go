@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jacaudi/dras/internal/httpretry"
 	"github.com/jacaudi/dras/internal/image"
 	"github.com/jacaudi/dras/internal/logger"
 )
@@ -38,13 +39,22 @@ type Client struct {
 }
 
 // New constructs a Client. Panics on empty BaseURL.
+//
+// When cfg.HTTPClient is nil, the default client wraps http.DefaultTransport
+// with httpretry.Transport so cold-start races (renderer pod still binding),
+// transient 5xx (502/503/504/500), 408/429, and network-layer errors (EOF
+// from a worker that hit OOM mid-request, connection refused) are
+// transparently retried with exponential backoff. Issue #101 / #103.
 func New(cfg Config) *Client {
 	if cfg.BaseURL == "" {
 		panic("renderer.New: BaseURL is required")
 	}
 	hc := cfg.HTTPClient
 	if hc == nil {
-		hc = &http.Client{Timeout: cfg.Timeout}
+		hc = &http.Client{
+			Timeout:   cfg.Timeout,
+			Transport: httpretry.DefaultTransport(),
+		}
 	}
 	return &Client{
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
