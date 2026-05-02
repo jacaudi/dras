@@ -1,11 +1,5 @@
 # Changelog
 
-## [2.7.1](https://github.com/jacaudi/dras/compare/v2.7.0...v2.7.1) (2026-05-02)
-
-### Bug Fixes
-
-* **docs:** update README badges to current CI workflows ([7e72b1a](https://github.com/jacaudi/dras/commit/7e72b1a7ccc5292932e7c2c3f91d61853c507d85))
-
 ## [2.7.0](https://github.com/jacaudi/dras/compare/v2.6.0...v2.7.0) (2026-05-02)
 
 ### Bug Fixes
