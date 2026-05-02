@@ -72,5 +72,24 @@ sprig set/unset/dig operate reliably on all nested keys.
 {{- $envs = append $envs (dict "name" "INTERVAL" "value" (toString .Values.dras.interval)) -}}
 {{- $_ := set $appContainer "env" $envs -}}
 
+{{- /* Advanced-mode-only wiring. Standard mode falls through to plain dras. */ -}}
+{{- if eq .Values.mode "advanced" -}}
+
+  {{- /* dras: RENDERER_URL pointing at the renderer Service */ -}}
+  {{- $rendURL := printf "http://%s-renderer.%s.svc.cluster.local:%v"
+        .Release.Name .Release.Namespace .Values.renderer.service.port -}}
+  {{- $drasEnv := $appContainer.env -}}
+  {{- $drasEnv = append $drasEnv (dict "name" "RENDERER_URL" "value" $rendURL) -}}
+  {{- $_ := set $appContainer "env" $drasEnv -}}
+
+  {{- /* renderer: S3_BUCKET, AWS_REGION envs */ -}}
+  {{- $rendContainer := $v.controllers.renderer.containers.app -}}
+  {{- $rendEnv := default (list) $rendContainer.env -}}
+  {{- $rendEnv = append $rendEnv (dict "name" "S3_BUCKET" "value" .Values.renderer.s3.bucket) -}}
+  {{- $rendEnv = append $rendEnv (dict "name" "AWS_REGION" "value" .Values.renderer.s3.region) -}}
+  {{- $_ := set $rendContainer "env" $rendEnv -}}
+
+{{- end -}}
+
 {{ toYaml $v }}
 {{- end -}}

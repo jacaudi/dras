@@ -104,9 +104,15 @@ controllers:
 
 service:
   # Stripped before app-template sees values when mode == standard.
+  # suffix: renderer causes bjw-s common to append "-renderer" to the
+  # fullname ("dras"), producing "dras-renderer". Without this, a single-
+  # service chart skips appending the identifier and the Service would be
+  # named "dras" — mismatching the RENDERER_URL DNS name injected by the
+  # _app-template-values.tpl helper.
   renderer:
     controller: renderer
     type: ClusterIP
+    suffix: renderer
     ports:
       http:
         port: 8080
