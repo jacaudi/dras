@@ -1,4 +1,4 @@
-[![On Merge](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-merge.yml) [![Versioned Release](https://github.com/jacaudi/dras/actions/workflows/on-release.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/on-release.yml)
+[![CI/CD](https://github.com/jacaudi/dras/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/ci-cd.yml) [![PR Validation](https://github.com/jacaudi/dras/actions/workflows/pr.yml/badge.svg)](https://github.com/jacaudi/dras/actions/workflows/pr.yml) [![Latest Release](https://img.shields.io/github/v/release/jacaudi/dras?logo=github)](https://github.com/jacaudi/dras/releases/latest) [![License](https://img.shields.io/github/license/jacaudi/dras)](LICENSE)
 
 # DRAS — Doppler Radar Alerting Service
 
