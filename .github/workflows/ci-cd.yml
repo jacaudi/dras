@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   lint:
-    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-lint.yml@v0.20.2
     permissions:
       contents: read
     with:
@@ -31,7 +31,7 @@ jobs:
     secrets: inherit
 
   test:
-    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-test.yml@v0.20.2
     permissions:
       contents: read
     with:
@@ -43,7 +43,7 @@ jobs:
   release:
     needs: [lint, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: jacaudi/github-actions/.github/workflows/component-semantic-release.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-semantic-release.yml@v0.20.2
     permissions:
       contents: write
       issues: write
@@ -81,7 +81,7 @@ jobs:
   container-dras:
     needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
-    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.2
     permissions:
       contents: read
       packages: write
@@ -108,7 +108,7 @@ jobs:
   container-renderer:
     needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
-    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-container-build.yml@v0.20.2
     permissions:
       contents: read
       packages: write
@@ -136,7 +136,7 @@ jobs:
   helm-publish:
     needs: [release, version-parts]
     if: needs.release.outputs.new-release-published == 'true'
-    uses: jacaudi/github-actions/.github/workflows/component-helm-publish.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-helm-publish.yml@v0.20.2
     permissions:
       contents: read
       packages: write
@@ -147,5 +147,5 @@ jobs:
   pipeline-summary:
     if: always()
     needs: [lint, test, release, container-dras, container-renderer, helm-publish]
-    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.20.1
+    uses: jacaudi/github-actions/.github/workflows/component-pipeline-summary.yml@v0.20.2
     secrets: inherit
