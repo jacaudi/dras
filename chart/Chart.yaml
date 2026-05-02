@@ -1,0 +1,15 @@
+apiVersion: v2
+name: dras
+description: Helm chart for dras — NEXRAD radar monitoring with optional renderer
+type: application
+version: 0.0.0
+appVersion: v0.0.0
+home: https://github.com/jacaudi/dras
+sources:
+  - https://github.com/jacaudi/dras
+maintainers:
+  - name: jacaudi
+dependencies:
+  - name: app-template
+    version: 4.6.2
+    repository: oci://ghcr.io/bjw-s-labs/helm
