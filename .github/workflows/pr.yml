@@ -180,7 +180,7 @@ jobs:
 
       - name: Install helm-unittest plugin
         if: steps.changes.outputs.chart == 'true'
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version 0.6.5
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.0.3
 
       - name: Install kubeconform
         if: steps.changes.outputs.chart == 'true'
