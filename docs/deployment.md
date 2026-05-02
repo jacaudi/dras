@@ -31,7 +31,58 @@ services:
 
 ### Kubernetes
 
-See [`examples/kubernetes.yaml`](../examples/kubernetes.yaml) for a deployment + configmap + secret skeleton.
+A minimal Deployment + ConfigMap + Secret skeleton. Replace the `<KEY>` / `<TOKEN>` placeholders before applying.
+
+```yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dras
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dras
+  template:
+    metadata:
+      labels:
+        app: dras
+    spec:
+      containers:
+        - name: dras
+          image: ghcr.io/jacaudi/dras:latest
+          envFrom:
+            - configMapRef:
+                name: dras-config
+            - secretRef:
+                name: dras-secret
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits:   { memory: 64Mi }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dras-config
+  namespace: default
+data:
+  STATION_IDS: KATX,KRAX
+  INTERVAL: "10"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dras-secret
+  namespace: default
+type: Opaque
+stringData:
+  PUSHOVER_USER_KEY: <KEY>
+  PUSHOVER_API_TOKEN: <TOKEN>
+```
+
+For advanced mode (dras + renderer), use the [project-owned Helm chart](../chart/README.md) — see below.
 
 ## Advanced mode
 
@@ -69,7 +120,7 @@ helm install dras oci://ghcr.io/jacaudi/charts/dras --version vX.Y.Z \
   --set dras.pushover.existingSecret=dras-pushover
 ```
 
-The chart's [README](../chart/README.md) has the full values reference and Pushover Secret setup. For a hand-rolled deployment, [`examples/kubernetes.yaml`](../examples/kubernetes.yaml) is still maintained.
+The chart's [README](../chart/README.md) has the full values reference and Pushover Secret setup.
 
 Networking notes:
 
