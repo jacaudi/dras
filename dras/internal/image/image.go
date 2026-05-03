@@ -100,13 +100,14 @@ func New(cfg Config) *Service {
 	// http.DefaultTransport with httpretry.Transport. This absorbs
 	// transient upstream NWS flakiness — DNS hiccups, 5xx, timeouts
 	// mid-request — without callers seeing them as fetch failures.
-	// Issue #101 / #103.
+	// defaultTimeout is applied per-attempt (each retry gets its own
+	// clock), not as http.Client.Timeout — see httpretry.Transport docs.
+	// Issue #101 / #103 / #107.
 	client := cfg.HTTPClient
 	if client == nil {
-		client = &http.Client{
-			Timeout:   defaultTimeout,
-			Transport: httpretry.DefaultTransport(),
-		}
+		rt := httpretry.DefaultTransport()
+		rt.PerAttemptTimeout = defaultTimeout
+		client = &http.Client{Transport: rt}
 	}
 
 	return &Service{

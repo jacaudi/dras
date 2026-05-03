@@ -11,6 +11,7 @@ package httpretry
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"math/rand/v2"
@@ -39,6 +40,20 @@ type Transport struct {
 
 	// MaxBackoff caps the per-retry wait. Defaults to 30s.
 	MaxBackoff time.Duration
+
+	// PerAttemptTimeout, if > 0, bounds each individual request attempt.
+	// Each attempt's context is derived from the parent request context
+	// with this deadline; on expiry the attempt fails with
+	// context.DeadlineExceeded and the retry loop tries again. The overall
+	// budget is therefore PerAttemptTimeout * MaxAttempts + total backoff,
+	// rather than one shared deadline. This is the standard fix for
+	// "Client.Timeout exceeded while awaiting headers" — a single slow
+	// attempt can no longer starve subsequent attempts of budget.
+	//
+	// Set this instead of http.Client.Timeout: the latter applies a single
+	// deadline to the entire round-trip including all retries, which
+	// defeats the retry loop when an individual attempt is slow.
+	PerAttemptTimeout time.Duration
 }
 
 // DefaultTransport returns a Transport with the documented defaults.
@@ -54,6 +69,11 @@ func DefaultTransport() *Transport {
 // RoundTrip executes req with retry-on-transient-failure. The request body
 // is buffered up front so it can be replayed on each attempt. Context
 // cancellation aborts the retry loop immediately.
+//
+// When PerAttemptTimeout > 0, each attempt runs under its own derived
+// context with that deadline. The returned response's Body wraps the
+// per-attempt cancel so closing the body releases the timer; callers must
+// close the body as usual.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	base := t.Base
 	if base == nil {
@@ -71,6 +91,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if maxBackoff <= 0 {
 		maxBackoff = 30 * time.Second
 	}
+	perAttempt := t.PerAttemptTimeout
 
 	// Buffer the body so we can reset it on each attempt.
 	var bodyBytes []byte
@@ -88,17 +109,49 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		lastErr error
 	)
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		// Restore body for this attempt.
+		// Bail before issuing if the parent context is already done.
+		if err := req.Context().Err(); err != nil {
+			return nil, err
+		}
+
+		// Build the per-attempt request. When PerAttemptTimeout is set
+		// each attempt gets its own deadline; otherwise we reuse the
+		// parent context directly.
+		attemptReq := req
+		var cancel context.CancelFunc
+		if perAttempt > 0 {
+			var attemptCtx context.Context
+			attemptCtx, cancel = context.WithTimeout(req.Context(), perAttempt)
+			attemptReq = req.WithContext(attemptCtx)
+		}
 		if bodyBytes != nil {
-			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			attemptReq.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		}
 
-		resp, lastErr = base.RoundTrip(req)
+		resp, lastErr = base.RoundTrip(attemptReq)
 
-		if !shouldRetry(resp, lastErr) {
-			return resp, lastErr
+		// Parent-context cancellation must not be retried — the caller
+		// gave up. Per-attempt deadlines are retryable (treated as a
+		// transient slow attempt) and fall through to shouldRetry.
+		if pErr := req.Context().Err(); pErr != nil {
+			drainAndClose(resp)
+			if cancel != nil {
+				cancel()
+			}
+			return nil, pErr
 		}
-		if attempt >= maxAttempts {
+
+		retry := shouldRetry(resp, lastErr)
+		isLast := attempt >= maxAttempts
+		if !retry || isLast {
+			// Terminal: success, non-transient error, or out of attempts.
+			// Wrap the body so closing it releases the per-attempt
+			// context timer; callers already close response bodies.
+			if resp != nil && cancel != nil {
+				resp.Body = &cancelOnClose{ReadCloser: resp.Body, cancel: cancel}
+			} else if cancel != nil {
+				cancel()
+			}
 			return resp, lastErr
 		}
 
@@ -121,14 +174,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		logger.WithFields(fields).Debug("retrying transient HTTP failure")
 
 		// Drain and close any previous response body so the connection
-		// can be reused.
-		if resp != nil {
-			_, _ = io.Copy(io.Discard, resp.Body)
-			_ = resp.Body.Close()
-			resp = nil
+		// can be reused, then release the per-attempt context.
+		drainAndClose(resp)
+		resp = nil
+		if cancel != nil {
+			cancel()
 		}
 
-		// Wait, respecting context cancellation.
+		// Wait, respecting parent context cancellation.
 		timer := time.NewTimer(wait)
 		select {
 		case <-timer.C:
@@ -139,6 +192,31 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	return resp, lastErr
+}
+
+// drainAndClose discards and closes a response body, ignoring errors. The
+// drain lets the underlying connection return to the pool for reuse.
+func drainAndClose(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// cancelOnClose wraps a response body so that Close() also cancels the
+// per-attempt context. The caller's normal "defer resp.Body.Close()" then
+// releases the timer; without this the timer would leak until it fires
+// (bounded by PerAttemptTimeout but still ugly).
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (c *cancelOnClose) Close() error {
+	err := c.ReadCloser.Close()
+	c.cancel()
+	return err
 }
 
 // shouldRetry returns true if the (resp, err) pair represents a transient
