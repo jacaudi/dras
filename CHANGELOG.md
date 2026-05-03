@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.7.4](https://github.com/jacaudi/dras/compare/v2.7.3...v2.7.4) (2026-05-03)
+
+### Bug Fixes
+
+* **renderer:** suppress /healthz access log unless at DEBUG ([591e5e9](https://github.com/jacaudi/dras/commit/591e5e9d1916fac0c302de6d5703c301799cdbf9))
+
 ## [2.7.3](https://github.com/jacaudi/dras/compare/v2.7.2...v2.7.3) (2026-05-03)
 
 ### Bug Fixes
