@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -15,6 +16,17 @@ from dras_renderer.s3 import (
     S3Error,
     VolumeNotFoundError,
 )
+
+
+def test_latest_volume_ttl_default_is_5_seconds() -> None:
+    """Lock the S3Client.latest_volume_ttl default at 5s.
+
+    The TTL exists to amortize the 1000-LIST fan-out across back-to-back
+    renders. Anything longer (the original 30s) can hide minute-old data
+    from the freshness checks. 5s still amortizes hot loops while keeping
+    user-visible freshness perception correct.
+    """
+    assert inspect.signature(S3Client).parameters["latest_volume_ttl"].default == 5.0
 
 BUCKET = "unidata-nexrad-level2-chunks"
 

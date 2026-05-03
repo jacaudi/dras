@@ -68,7 +68,7 @@ class S3Client:
         anonymous: bool = True,
         list_workers: int = 64,
         download_workers: int | None = None,
-        latest_volume_ttl: float = 30.0,
+        latest_volume_ttl: float = 5.0,
     ) -> None:
         self.bucket = bucket
         self.region = region
@@ -80,8 +80,12 @@ class S3Client:
         self._client: Any = boto3.client(
             "s3", region_name=region, config=_make_config(anonymous)
         )
-        # Negative results (None for unknown stations) are cached too — that's
-        # deliberate, to suppress 1000-LIST fan-out on typo'd station IDs.
+        # Short TTL amortizes the 1000-LIST fan-out across back-to-back renders
+        # (hot-loop coalescing) without masking new chunks: NEXRAD chunks land
+        # every few seconds, so 5s keeps freshness perception correct while still
+        # collapsing duplicate work in tight render loops. Negative results
+        # (None for unknown stations) are cached too — deliberate, to suppress
+        # the 1000-LIST fan-out on typo'd station IDs.
         self._latest_cache: TTLCache[str, LatestVolume | None] = TTLCache(
             maxsize=256, ttl=latest_volume_ttl,
         )
