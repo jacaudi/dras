@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.10.1](https://github.com/jacaudi/dras/compare/v2.10.0...v2.10.1) (2026-05-03)
+
+### Bug Fixes
+
+* **build:** wire VERSION/BUILDTIME/REVISION/BRANCH end-to-end ([#82](https://github.com/jacaudi/dras/issues/82)) ([#112](https://github.com/jacaudi/dras/issues/112)) ([7c4f341](https://github.com/jacaudi/dras/commit/7c4f341669e35d23d537864ebaebca53c2642045)), closes [#79](https://github.com/jacaudi/dras/issues/79) [post-#79](https://github.com/post-/issues/79) [post-#79](https://github.com/post-/issues/79)
+
 ## [2.10.0](https://github.com/jacaudi/dras/compare/v2.9.0...v2.10.0) (2026-05-03)
 
 ## [2.9.0](https://github.com/jacaudi/dras/compare/v2.8.2...v2.9.0) (2026-05-03)
