@@ -20,6 +20,8 @@ import cartopy.feature as cfeature  # type: ignore[import-untyped]
 import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt
 import pyart  # type: ignore[import-untyped]
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from dras_renderer.decode import DecodedScan
 
@@ -78,79 +80,23 @@ class RenderOptions:
     cities_max_scalerank: int = 8
 
 
-def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
+def render_base_reflectivity(
+    scan: DecodedScan,
+    opts: RenderOptions,
+    *,
+    data_age_seconds: float | None = None,
+) -> bytes:
     """Render the lowest-tilt base reflectivity as a PPI on a Cartopy basemap.
 
     Returns PNG bytes sized exactly to ``(opts.width, opts.height)``.
+
+    When ``data_age_seconds`` is provided, the axes title is overridden to
+    show both the volume start time (``scan.scan_time``) and the freshest
+    chunk's age at render time, so callers can see "+Δ Ns" at a glance.
+    When ``None``, Py-ART's default title is left intact.
     """
-    fig = plt.figure(
-        figsize=(opts.width / opts.dpi, opts.height / opts.dpi),
-        dpi=opts.dpi,
-    )
+    fig, _ax = _render_figure(scan, opts, data_age_seconds)
     try:
-        radar = scan.radar
-        radar_lat = float(radar.latitude["data"][0])
-        radar_lon = float(radar.longitude["data"][0])
-
-        center_lat = opts.center_lat if opts.center_lat is not None else radar_lat
-        center_lon = opts.center_lon if opts.center_lon is not None else radar_lon
-
-        projection = ccrs.LambertConformal(
-            central_latitude=center_lat,
-            central_longitude=center_lon,
-        )
-        ax = fig.add_subplot(1, 1, 1, projection=projection)
-
-        # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
-        # cos(lat) correction the east-west extent stretches by 33% at KATX
-        # (lat ~48°) and ~50% at high-latitude AK stations.
-        delta_lat = opts.range_km / 111.0
-        delta_lon = delta_lat / max(math.cos(math.radians(center_lat)), 1e-6)
-        extent = (
-            center_lon - delta_lon,
-            center_lon + delta_lon,
-            center_lat - delta_lat,
-            center_lat + delta_lat,
-        )
-        ax.set_extent(extent, crs=ccrs.PlateCarree())
-
-        # Basemap layers, drawn from bottom up.
-        if opts.show_lakes:
-            ax.add_feature(
-                cfeature.LAKES.with_scale("50m"),
-                facecolor="none",
-                edgecolor="#4a6da7",
-                linewidth=0.4,
-            )
-        ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
-        ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
-        if opts.show_borders:
-            ax.add_feature(
-                cfeature.BORDERS.with_scale("50m"),
-                edgecolor="gray",
-                linewidth=0.5,
-            )
-
-        gatefilter = _build_clutter_filter(radar, opts) if opts.clutter_filter else None
-
-        display = pyart.graph.RadarMapDisplay(radar)
-        # sweep=0 == lowest tilt: Py-ART sorts sweeps by ascending elevation.
-        display.plot_ppi_map(
-            "reflectivity",
-            sweep=0,
-            ax=ax,
-            gatefilter=gatefilter,
-            colorbar_flag=False,
-            title_flag=True,
-            vmin=opts.vmin,
-            vmax=opts.vmax,
-            cmap="pyart_NWSRef",
-            embellish=False,  # We add our own basemap features above.
-        )
-
-        if opts.show_cities:
-            _add_cities(ax, extent, max_scalerank=opts.cities_max_scalerank)
-
         buf = io.BytesIO()
         # IMPORTANT: do NOT pass bbox_inches="tight" — it crops to content
         # and produces non-deterministic output dimensions, which would
@@ -160,6 +106,96 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
         return buf.getvalue()
     finally:
         plt.close(fig)
+
+
+def _render_figure(
+    scan: DecodedScan,
+    opts: RenderOptions,
+    data_age_seconds: float | None,
+) -> tuple[Figure, Axes]:
+    """Build the matplotlib figure + axes for a render.
+
+    Split out from ``render_base_reflectivity`` so tests can introspect the
+    axes (title, artists) before the figure is closed. The caller owns the
+    returned ``Figure`` and is responsible for calling ``plt.close(fig)``.
+    """
+    fig = plt.figure(
+        figsize=(opts.width / opts.dpi, opts.height / opts.dpi),
+        dpi=opts.dpi,
+    )
+    radar = scan.radar
+    radar_lat = float(radar.latitude["data"][0])
+    radar_lon = float(radar.longitude["data"][0])
+
+    center_lat = opts.center_lat if opts.center_lat is not None else radar_lat
+    center_lon = opts.center_lon if opts.center_lon is not None else radar_lon
+
+    projection = ccrs.LambertConformal(
+        central_latitude=center_lat,
+        central_longitude=center_lon,
+    )
+    ax = fig.add_subplot(1, 1, 1, projection=projection)
+
+    # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
+    # cos(lat) correction the east-west extent stretches by 33% at KATX
+    # (lat ~48°) and ~50% at high-latitude AK stations.
+    delta_lat = opts.range_km / 111.0
+    delta_lon = delta_lat / max(math.cos(math.radians(center_lat)), 1e-6)
+    extent = (
+        center_lon - delta_lon,
+        center_lon + delta_lon,
+        center_lat - delta_lat,
+        center_lat + delta_lat,
+    )
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+
+    # Basemap layers, drawn from bottom up.
+    if opts.show_lakes:
+        ax.add_feature(
+            cfeature.LAKES.with_scale("50m"),
+            facecolor="none",
+            edgecolor="#4a6da7",
+            linewidth=0.4,
+        )
+    ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
+    ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
+    if opts.show_borders:
+        ax.add_feature(
+            cfeature.BORDERS.with_scale("50m"),
+            edgecolor="gray",
+            linewidth=0.5,
+        )
+
+    gatefilter = _build_clutter_filter(radar, opts) if opts.clutter_filter else None
+
+    display = pyart.graph.RadarMapDisplay(radar)
+    # sweep=0 == lowest tilt: Py-ART sorts sweeps by ascending elevation.
+    display.plot_ppi_map(
+        "reflectivity",
+        sweep=0,
+        ax=ax,
+        gatefilter=gatefilter,
+        colorbar_flag=False,
+        title_flag=True,
+        vmin=opts.vmin,
+        vmax=opts.vmax,
+        cmap="pyart_NWSRef",
+        embellish=False,  # We add our own basemap features above.
+    )
+
+    # Override Py-ART's default title to surface both the volume start time
+    # and the freshest-chunk age — answers "is this image stale?" at a glance.
+    # MUST come after plot_ppi_map, which sets its own title via title_flag=True.
+    if data_age_seconds is not None:
+        ax.set_title(
+            f"{scan.station_id} {scan.elevation_deg:.1f} Deg. "
+            f"{scan.scan_time.isoformat()}  +Δ {data_age_seconds:.0f}s"
+        )
+
+    if opts.show_cities:
+        _add_cities(ax, extent, max_scalerank=opts.cities_max_scalerank)
+
+    return fig, ax
 
 
 def _build_clutter_filter(radar: Any, opts: RenderOptions) -> Any:

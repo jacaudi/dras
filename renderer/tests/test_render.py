@@ -6,11 +6,16 @@ import gzip
 import io
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pytest
 from PIL import Image
 
 from dras_renderer.decode import DecodedScan, decode_level2_archive
-from dras_renderer.render import RenderOptions, render_base_reflectivity
+from dras_renderer.render import (
+    RenderOptions,
+    _render_figure,
+    render_base_reflectivity,
+)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "KATX_test.ar2v.gz"
 
@@ -62,6 +67,40 @@ def test_render_clutter_filter_changes_output(decoded: DecodedScan) -> None:
     filtered = render_base_reflectivity(decoded, RenderOptions(clutter_filter=True))
     raw = render_base_reflectivity(decoded, RenderOptions(clutter_filter=False))
     assert filtered != raw
+
+
+def test_render_title_includes_scan_time_and_data_age(decoded: DecodedScan) -> None:
+    """When data_age_seconds is provided, the axes title is overridden to
+    include the volume start (scan_time iso), the station id, and the
+    +Δ data-age annotation.
+
+    Uses 30.0 to dodge banker's-rounding ambiguity on .5 values.
+    """
+    fig, ax = _render_figure(decoded, RenderOptions(), data_age_seconds=30.0)
+    try:
+        title = ax.get_title()
+    finally:
+        plt.close(fig)
+
+    assert decoded.scan_time.isoformat() in title
+    assert "+Δ" in title  # "+Δ"
+    assert "30s" in title
+    assert decoded.station_id in title
+
+
+def test_render_default_title_unchanged_when_no_age(decoded: DecodedScan) -> None:
+    """Without data_age_seconds, leave Py-ART's default title intact —
+    don't pin the exact text (locks us to a Py-ART version), but assert
+    it's non-empty and lacks the "+Δ" annotation.
+    """
+    fig, ax = _render_figure(decoded, RenderOptions(), data_age_seconds=None)
+    try:
+        title = ax.get_title()
+    finally:
+        plt.close(fig)
+
+    assert title  # non-empty
+    assert "+Δ" not in title
 
 
 def test_matplotlib_uses_agg_backend() -> None:

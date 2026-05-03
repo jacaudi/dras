@@ -143,7 +143,7 @@ class RenderService:
             # data_age_at_render reflects the freshness perceived by callers.
             render_time = datetime.now(UTC)
             data_age = (render_time - volume.latest_chunk_uploaded_at).total_seconds()
-            png = render_base_reflectivity(decoded, opts)
+            png = render_base_reflectivity(decoded, opts, data_age_seconds=data_age)
 
             meta = RenderMetadata(
                 station=req.station,
