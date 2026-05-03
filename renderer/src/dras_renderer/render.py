@@ -6,6 +6,7 @@ import io
 import math
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 # Headless backend MUST be selected before importing pyplot. ``matplotlib.use``
 # is authoritative — it overrides the env-var-based detection that runs at
@@ -153,7 +154,7 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
         plt.close(fig)
 
 
-def _build_clutter_filter(radar, opts: RenderOptions):
+def _build_clutter_filter(radar: Any, opts: RenderOptions) -> Any:
     """Construct a Py-ART GateFilter for non-meteorological echo removal.
 
     Stack:
@@ -204,7 +205,9 @@ def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
     return tuple(out)
 
 
-def _add_cities(ax, extent, max_scalerank: int) -> None:
+def _add_cities(
+    ax: Any, extent: tuple[float, float, float, float], max_scalerank: int
+) -> None:
     """Plot Natural Earth populated places that lie inside the extent.
 
     Filters by SCALERANK so dense metros don't drown the map in labels.
