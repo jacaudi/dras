@@ -15,21 +15,16 @@ tests:
       image.renderer.tag: ""
     asserts:
       - documentSelector:
-          path: metadata.name
-          value: dras
-        isKind:
-          of: Deployment
-      - documentSelector:
-          path: metadata.name
-          value: dras
+          path: kind
+          value: Deployment
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras:v7\.7\.7$
       - documentSelector:
-          path: metadata.labels["app.kubernetes.io/controller"]
-          value: renderer
+          path: kind
+          value: Deployment
         matchRegex:
-          path: spec.template.spec.containers[0].image
+          path: spec.template.spec.initContainers[0].image
           pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
 
   - it: explicit image.dras.tag override is honored, renderer still defaults
@@ -40,16 +35,16 @@ tests:
       image.renderer.tag: ""
     asserts:
       - documentSelector:
-          path: metadata.name
-          value: dras
+          path: kind
+          value: Deployment
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/jacaudi/dras:v1\.2\.3-pinned$
       - documentSelector:
-          path: metadata.labels["app.kubernetes.io/controller"]
-          value: renderer
+          path: kind
+          value: Deployment
         matchRegex:
-          path: spec.template.spec.containers[0].image
+          path: spec.template.spec.initContainers[0].image
           pattern: ^ghcr\.io/jacaudi/dras-renderer:v7\.7\.7$
 
   - it: explicit image.dras.repository override is honored
@@ -61,8 +56,8 @@ tests:
       image.renderer.tag: ""
     asserts:
       - documentSelector:
-          path: metadata.name
-          value: dras
+          path: kind
+          value: Deployment
         matchRegex:
           path: spec.template.spec.containers[0].image
           pattern: ^ghcr\.io/myorg/dras-fork:v0\.1\.0$

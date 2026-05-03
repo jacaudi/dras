@@ -78,6 +78,84 @@ def test_render_route_s3_failure() -> None:
     assert body["error"] == "internal"
 
 
+def test_render_route_view_preset_overrides_request(fixture_bytes: bytes) -> None:
+    """``?view=metro`` resolves to the station-specific override and
+    overrides any explicit center/range params on the same request."""
+    captured: list[dict] = []
+
+    real_render = None
+
+    def spy_render(self, req):
+        captured.append(
+            {
+                "station": req.station,
+                "range_km": req.range_km,
+                "center_lat": req.center_lat,
+                "center_lon": req.center_lon,
+            }
+        )
+        return real_render(self, req)  # type: ignore[misc]
+
+    from dras_renderer.service import RenderService
+
+    real_render = RenderService.render
+    with patch("dras_renderer.s3.S3Client.latest_volume", return_value=_vol()), \
+         patch("dras_renderer.s3.S3Client.download_volume", return_value=fixture_bytes), \
+         patch.object(RenderService, "render", autospec=True, side_effect=spy_render):
+        client = TestClient(build_app())
+        resp = client.get(
+            "/render/KATX",
+            params={
+                "view": "metro",
+                # These would lose to the preset.
+                "range_km": 230.0,
+                "center_lat": 0.0,
+                "center_lon": 0.0,
+            },
+        )
+
+    assert resp.status_code == 200
+    assert captured, "render was not called"
+    call = captured[0]
+    assert call["range_km"] == 70.0
+    assert call["center_lat"] == 47.61
+    assert call["center_lon"] == -122.33
+
+
+def test_render_route_unknown_view_uses_request_params(fixture_bytes: bytes) -> None:
+    """An unknown view name doesn't error — it just falls through to the
+    request's explicit center/range (radar-centered defaults if none)."""
+    captured: list[dict] = []
+    real_render = None
+
+    def spy_render(self, req):
+        captured.append(
+            {
+                "range_km": req.range_km,
+                "center_lat": req.center_lat,
+                "center_lon": req.center_lon,
+            }
+        )
+        return real_render(self, req)  # type: ignore[misc]
+
+    from dras_renderer.service import RenderService
+
+    real_render = RenderService.render
+    with patch("dras_renderer.s3.S3Client.latest_volume", return_value=_vol()), \
+         patch("dras_renderer.s3.S3Client.download_volume", return_value=fixture_bytes), \
+         patch.object(RenderService, "render", autospec=True, side_effect=spy_render):
+        client = TestClient(build_app())
+        resp = client.get(
+            "/render/KATX",
+            params={"view": "nonsense", "range_km": 120.0},
+        )
+
+    assert resp.status_code == 200
+    assert captured[0]["range_km"] == 120.0
+    assert captured[0]["center_lat"] is None
+    assert captured[0]["center_lon"] is None
+
+
 def test_render_route_lowercases_station(fixture_bytes: bytes) -> None:
     """Station IDs in the URL are normalized to uppercase before going to S3."""
     captured: dict[str, str] = {}
