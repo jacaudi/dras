@@ -113,9 +113,13 @@ class RenderService:
             if cached_png is not None and cached_meta is not None:
                 # Recompute data_age_at_render so the cached envelope reports
                 # current age, not the age at the time of the original render.
-                fresh_age = (
-                    datetime.now(UTC) - volume.latest_chunk_uploaded_at
-                ).total_seconds()
+                # Clamp at 0 to absorb sub-second NTP skew between the local
+                # clock and S3's LastModified clock — a "-0.4s" age would be
+                # honest but useless and renders awkwardly in the PNG title.
+                fresh_age = max(
+                    0.0,
+                    (datetime.now(UTC) - volume.latest_chunk_uploaded_at).total_seconds(),
+                )
                 return RenderResponse(
                     png=cached_png,
                     metadata=replace(cached_meta, data_age_at_render=fresh_age),
@@ -142,7 +146,10 @@ class RenderService:
             # Capture render_time as close to the render call as possible so
             # data_age_at_render reflects the freshness perceived by callers.
             render_time = datetime.now(UTC)
-            data_age = (render_time - volume.latest_chunk_uploaded_at).total_seconds()
+            data_age = max(
+                0.0,
+                (render_time - volume.latest_chunk_uploaded_at).total_seconds(),
+            )
             png = render_base_reflectivity(decoded, opts, data_age_seconds=data_age)
 
             meta = RenderMetadata(

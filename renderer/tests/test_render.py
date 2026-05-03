@@ -83,8 +83,9 @@ def test_render_title_includes_scan_time_and_data_age(decoded: DecodedScan) -> N
         plt.close(fig)
 
     assert decoded.scan_time.isoformat() in title
-    assert "+Δ" in title  # "+Δ"
-    assert "30s" in title
+    # Pin the joined token so a future format drift (e.g. dropping the Δ or
+    # the trailing "s") is caught, not just the substrings independently.
+    assert "+Δ 30s" in title
     assert decoded.station_id in title
 
 
