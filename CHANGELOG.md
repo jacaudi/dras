@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.8.1](https://github.com/jacaudi/dras/compare/v2.8.0...v2.8.1) (2026-05-03)
+
+### Bug Fixes
+
+* **chart:** startupProbe gates dras on renderer /healthz; rename back to 'renderer' ([b2680cd](https://github.com/jacaudi/dras/commit/b2680cd73ddbb470d62de94ba79aa75b233fbbea))
+
 ## [2.8.0](https://github.com/jacaudi/dras/compare/v2.7.4...v2.8.0) (2026-05-03)
 
 ### Features
