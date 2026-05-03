@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.8.0](https://github.com/jacaudi/dras/compare/v2.7.4...v2.8.0) (2026-05-03)
+
+### Features
+
+* **renderer,chart:** clutter+cities+zoom + single-pod sidecar layout ([#109](https://github.com/jacaudi/dras/issues/109)) ([e68b698](https://github.com/jacaudi/dras/commit/e68b6989b40a5448419739543b02dbbfa4b0ef39))
+
 ## [2.7.4](https://github.com/jacaudi/dras/compare/v2.7.3...v2.7.4) (2026-05-03)
 
 ### Bug Fixes
