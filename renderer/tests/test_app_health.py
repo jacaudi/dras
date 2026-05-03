@@ -29,6 +29,7 @@ def test_render_response_scan_time_is_iso8601() -> None:
         elevation_deg=0.5,
         vcp=212,
         renderer_version="test",
+        data_age_at_render=1.5,
     )
     fake_resp = RenderResponse(png=b"\x89PNG\r\n\x1a\n", metadata=fake_meta)
 

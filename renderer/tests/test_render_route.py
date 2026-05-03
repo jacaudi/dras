@@ -28,6 +28,7 @@ def _vol() -> LatestVolume:
         volume_number=492,
         chunk_keys=("KATX/492/20260501-180941-001-S",),
         latest_chunk_time=datetime(2026, 5, 1, 18, 9, 41, tzinfo=UTC),
+        latest_chunk_uploaded_at=datetime(2026, 5, 1, 18, 9, 50, tzinfo=UTC),
     )
 
 
@@ -44,6 +45,21 @@ def test_render_route_returns_envelope(fixture_bytes: bytes) -> None:
     assert body["metadata"]["renderer_version"]
     png_bytes = base64.b64decode(body["image"])
     assert png_bytes.startswith(b"\x89PNG")
+
+
+def test_render_route_includes_data_age_seconds(fixture_bytes: bytes) -> None:
+    """The response envelope must surface ``metadata.data_age_seconds``."""
+    with patch("dras_renderer.s3.S3Client.latest_volume", return_value=_vol()), \
+         patch("dras_renderer.s3.S3Client.download_volume", return_value=fixture_bytes):
+        client = TestClient(build_app())
+        resp = client.get("/render/KATX")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "data_age_seconds" in body["metadata"]
+    age = body["metadata"]["data_age_seconds"]
+    assert isinstance(age, (int, float))
+    assert age >= 0
 
 
 def test_render_route_no_recent_volume() -> None:

@@ -27,6 +27,7 @@ def _vol() -> LatestVolume:
         volume_number=492,
         chunk_keys=("KATX/492/20260501-180941-001-S",),
         latest_chunk_time=datetime(2026, 5, 1, 18, 9, 41, tzinfo=UTC),
+        latest_chunk_uploaded_at=datetime(2026, 5, 1, 18, 9, 50, tzinfo=UTC),
     )
 
 
@@ -107,6 +108,38 @@ def test_render_increments_s3_errors_on_list_failure() -> None:
     after = S3_ERRORS_TOTAL._value.get()  # type: ignore[attr-defined]
     assert after == before + 1
     s3.download_volume.assert_not_called()
+
+
+def test_metadata_includes_data_age_at_render_nonneg(fixture_bytes: bytes) -> None:
+    """``data_age_at_render`` is render_time - latest_chunk_uploaded_at and must be >= 0."""
+    s3 = MagicMock()
+    s3.latest_volume.return_value = _vol()
+    s3.download_volume.return_value = fixture_bytes
+
+    svc = RenderService(s3=s3, cache=RenderCache(max_size=8))
+    resp = svc.render(RenderRequest(station="KATX"))
+
+    assert isinstance(resp.metadata.data_age_at_render, float)
+    assert resp.metadata.data_age_at_render >= 0.0
+
+
+def test_cache_hit_recomputes_data_age(fixture_bytes: bytes) -> None:
+    """The cache short-circuits the s3 download but data age must reflect
+    the current request time, not the cached metadata's age."""
+    import time
+
+    s3 = MagicMock()
+    s3.latest_volume.return_value = _vol()
+    s3.download_volume.return_value = fixture_bytes
+
+    svc = RenderService(s3=s3, cache=RenderCache(max_size=8))
+    resp1 = svc.render(RenderRequest(station="KATX"))
+    time.sleep(0.05)
+    resp2 = svc.render(RenderRequest(station="KATX"))
+
+    assert s3.download_volume.call_count == 1  # second was a cache hit
+    assert resp1.metadata.data_age_at_render > 0.0
+    assert resp2.metadata.data_age_at_render > resp1.metadata.data_age_at_render
 
 
 def test_render_increments_s3_errors_on_download_failure() -> None:

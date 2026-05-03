@@ -42,7 +42,9 @@ class LatestVolume:
     station_id: str
     volume_number: int
     chunk_keys: tuple[str, ...]  # sorted by chunk-num (== lex order due to zero-padding)
-    latest_chunk_time: datetime
+    latest_chunk_time: datetime  # volume START (parsed from chunk filename ts prefix)
+    # Max S3 LastModified across the winning slot's filtered chunks.
+    latest_chunk_uploaded_at: datetime
 
 
 def _make_config(anonymous: bool) -> BotocoreConfig:
@@ -68,7 +70,7 @@ class S3Client:
         anonymous: bool = True,
         list_workers: int = 64,
         download_workers: int | None = None,
-        latest_volume_ttl: float = 30.0,
+        latest_volume_ttl: float = 5.0,
     ) -> None:
         self.bucket = bucket
         self.region = region
@@ -80,8 +82,12 @@ class S3Client:
         self._client: Any = boto3.client(
             "s3", region_name=region, config=_make_config(anonymous)
         )
-        # Negative results (None for unknown stations) are cached too — that's
-        # deliberate, to suppress 1000-LIST fan-out on typo'd station IDs.
+        # Short TTL amortizes the 1000-LIST fan-out across back-to-back renders
+        # (hot-loop coalescing) without masking new chunks: NEXRAD chunks land
+        # every few seconds, so 5s keeps freshness perception correct while still
+        # collapsing duplicate work in tight render loops. Negative results
+        # (None for unknown stations) are cached too — deliberate, to suppress
+        # the 1000-LIST fan-out on typo'd station IDs.
         self._latest_cache: TTLCache[str, LatestVolume | None] = TTLCache(
             maxsize=256, ttl=latest_volume_ttl,
         )
@@ -103,18 +109,23 @@ class S3Client:
         return result
 
     def _compute_latest_volume(self, station_id: str) -> LatestVolume | None:
-        def chunks_for(vol_num: int) -> tuple[int, list[str]]:
+        def chunks_for(vol_num: int) -> tuple[int, list[tuple[str, datetime]]]:
             return vol_num, self._list_keys(f"{station_id}/{vol_num}/")
 
         with ThreadPoolExecutor(max_workers=self.list_workers) as executor:
             results = list(executor.map(chunks_for, VOLUME_SLOTS))
 
-        # ``sorted(keys)`` orders chunks by lex; chunk filenames are
+        # Sort each slot's entries by key (lex). Chunk filenames are
         # ``<YYYYMMDD-HHMMSS>-<NNN>-<TYPE>``, where the chunk-num field is
         # zero-padded to 3 digits. Within a single volume's keys this makes
         # lex order == chronological / chunk-num order. If NOAA ever drops
         # the zero-pad, parse the chunk-num explicitly via ``int(name.rsplit("-", 2)[-2])``.
-        non_empty = [(v, sorted(keys)) for v, keys in results if keys]
+        # ``last_modified`` rides along on each tuple; we don't sort by it.
+        non_empty = [
+            (v, sorted(entries, key=lambda kt: kt[0]))
+            for v, entries in results
+            if entries
+        ]
         if not non_empty:
             return None
 
@@ -122,16 +133,19 @@ class S3Client:
         # filename — defensive against future drift in the chunk-num/type
         # suffix format (e.g. a per-tilt suffix change). The volume start
         # timestamp is what determines recency.
-        def prefix_key(item: tuple[int, list[str]]) -> str:
-            return item[1][-1].rsplit("/", 1)[-1][:15]
+        def prefix_key(item: tuple[int, list[tuple[str, datetime]]]) -> str:
+            return item[1][-1][0].rsplit("/", 1)[-1][:15]
 
-        best_vol, best_chunks = max(non_empty, key=prefix_key)
-        ts_prefix = prefix_key((best_vol, best_chunks))  # "YYYYMMDD-HHMMSS"
+        best_vol, best_entries = max(non_empty, key=prefix_key)
+        ts_prefix = prefix_key((best_vol, best_entries))  # "YYYYMMDD-HHMMSS"
         # Slots are reused (volume IDs cycle 0-999). A slot mid-overwrite can hold
         # chunks from two distinct volumes; keep only the winning volume's chunks.
-        volume_chunks = tuple(
-            k for k in best_chunks if k.rsplit("/", 1)[-1].startswith(ts_prefix)
-        )
+        winning_filtered = [
+            (k, lm) for (k, lm) in best_entries
+            if k.rsplit("/", 1)[-1].startswith(ts_prefix)
+        ]
+        volume_chunks = tuple(k for (k, _lm) in winning_filtered)
+        latest_uploaded_at = max(lm for (_k, lm) in winning_filtered)
         latest_time = datetime.strptime(ts_prefix, "%Y%m%d-%H%M%S").replace(tzinfo=UTC)
 
         return LatestVolume(
@@ -139,6 +153,7 @@ class S3Client:
             volume_number=best_vol,
             chunk_keys=volume_chunks,
             latest_chunk_time=latest_time,
+            latest_chunk_uploaded_at=latest_uploaded_at,
         )
 
     def download_volume(self, volume: LatestVolume) -> bytes:
@@ -174,14 +189,19 @@ class S3Client:
 
         return b"".join(bodies)
 
-    def _list_keys(self, prefix: str) -> list[str]:
-        keys: list[str] = []
+    def _list_keys(self, prefix: str) -> list[tuple[str, datetime]]:
+        """List object (key, LastModified) pairs under ``prefix``.
+
+        ``LastModified`` is a tz-aware datetime that boto3's paginator already
+        surfaces in each ``Contents`` entry — no extra HEAD/GET round trip.
+        """
+        entries: list[tuple[str, datetime]] = []
         paginator = self._client.get_paginator("list_objects_v2")
         try:
             for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
                 for entry in page.get("Contents", []):
-                    keys.append(entry["Key"])
+                    entries.append((entry["Key"], entry["LastModified"]))
         except ClientError as e:
             code = e.response.get("Error", {}).get("Code", "")
             raise S3Error(f"S3 list_objects_v2 failed on {prefix}: {code}") from e
-        return keys
+        return entries

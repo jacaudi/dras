@@ -44,6 +44,7 @@ class MetadataModel(BaseModel):
     elevation_deg: float
     vcp: int
     renderer_version: str
+    data_age_seconds: float
 
 
 class RenderEnvelope(BaseModel):
@@ -119,6 +120,7 @@ def build_app(config: Config | None = None) -> FastAPI:
                 elevation_deg=resp.metadata.elevation_deg,
                 vcp=resp.metadata.vcp,
                 renderer_version=resp.metadata.renderer_version,
+                data_age_seconds=resp.metadata.data_age_at_render,
             ),
         )
 
