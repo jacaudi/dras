@@ -45,16 +45,20 @@ type Client struct {
 // transient 5xx (502/503/504/500), 408/429, and network-layer errors (EOF
 // from a worker that hit OOM mid-request, connection refused) are
 // transparently retried with exponential backoff. Issue #101 / #103.
+//
+// cfg.Timeout is applied per-attempt via httpretry.Transport.PerAttemptTimeout
+// — each retry gets its own clock. http.Client.Timeout is left at zero
+// because it would otherwise share a single deadline across all retries,
+// letting one slow attempt starve the budget.
 func New(cfg Config) *Client {
 	if cfg.BaseURL == "" {
 		panic("renderer.New: BaseURL is required")
 	}
 	hc := cfg.HTTPClient
 	if hc == nil {
-		hc = &http.Client{
-			Timeout:   cfg.Timeout,
-			Transport: httpretry.DefaultTransport(),
-		}
+		rt := httpretry.DefaultTransport()
+		rt.PerAttemptTimeout = cfg.Timeout
+		hc = &http.Client{Transport: rt}
 	}
 	return &Client{
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),

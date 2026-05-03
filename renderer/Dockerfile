@@ -56,10 +56,21 @@ print('cartopy cache warmed')\
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 
 ARG VERSION
+# HOME is pinned (not derived from /etc/passwd) so the image works under any
+# numeric runAsUser — Kubernetes operators frequently override the image's
+# baked-in USER to satisfy cluster policy (PSA restricted, OPA, kyverno).
+# Without this, an unknown uid resolves $HOME to / and Cartopy/Matplotlib try
+# to mkdir /.local and /.config respectively. Issue #107.
+#
+# MPLCONFIGDIR points at /tmp so Matplotlib never needs to write to $HOME on
+# import. Mirrors the chart-side setting added for #101 — bake it into the
+# image so the image is self-sufficient even without the chart's env block.
 ENV DRAS_RENDERER_VERSION=${VERSION} \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MPLBACKEND=Agg \
+    HOME=/home/renderer \
+    MPLCONFIGDIR=/tmp/matplotlib \
     PATH="/app/.venv/bin:$PATH"
 
 # Runtime libs only — no -dev packages. bookworm-slim ships GDAL 3.6 binaries
@@ -77,18 +88,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
-# Copy the warmed Cartopy cache and chown it for the renderer user.
+# Copy the warmed Cartopy cache and chown it for the renderer user, then
+# make every path under HOME world-readable+traversable so the image works
+# under any non-root uid (including operator-overridden runAsUser values
+# that don't match 10001). Issue #107.
 COPY --from=builder --chown=renderer:renderer /root/.local/share/cartopy /home/renderer/.local/share/cartopy
-# Verify the runtime user can actually read the cached Natural Earth data.
-# Run as the renderer UID (not root) so a future ownership/perms regression
-# in the COPY --chown above is caught at build time, not at first request.
+RUN chmod -R go+rX /home/renderer
+# Verify the warmed cache is reachable as the baked-in renderer user AND
+# under an arbitrary "policy-pinned" non-root uid. The second check is the
+# regression guard for #107 — if a future change re-introduces uid-coupled
+# perms, the build fails here instead of at first request in production.
 USER renderer
-RUN HOME=/home/renderer /app/.venv/bin/python -c "\
+RUN /app/.venv/bin/python -c "\
 import cartopy.feature as cf;\
 states=list(cf.STATES.with_scale('50m').geometries());\
 coast=list(cf.COASTLINE.with_scale('50m').geometries());\
 assert states and coast, 'cartopy cache copy is empty or unreachable';\
-print(f'cartopy cache verified: {len(states)} states, {len(coast)} coastline features')\
+print(f'cartopy cache verified (uid renderer): {len(states)} states, {len(coast)} coastline features')\
+"
+USER 65532
+RUN /app/.venv/bin/python -c "\
+import cartopy.feature as cf;\
+states=list(cf.STATES.with_scale('50m').geometries());\
+coast=list(cf.COASTLINE.with_scale('50m').geometries());\
+assert states and coast, 'cartopy cache unreachable under unknown uid';\
+print(f'cartopy cache verified (uid 65532): {len(states)} states, {len(coast)} coastline features')\
 "
 USER root
 COPY --chown=renderer:renderer src /app/src

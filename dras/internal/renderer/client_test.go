@@ -77,12 +77,18 @@ func TestFetchServerErrorReturnsError(t *testing.T) {
 
 func TestFetchTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(500 * time.Millisecond)
+		<-r.Context().Done()
 	}))
 	defer srv.Close()
 
-	c := New(Config{BaseURL: srv.URL, Timeout: 100 * time.Millisecond})
-	_, err := c.Fetch(t.Context(), "KATX")
+	// Per-attempt timeout = 50ms; parent-context deadline at 200ms keeps
+	// the retry loop from burning four attempts of backoff before giving
+	// up. Without the parent deadline, the retry transport retries each
+	// timed-out attempt and the test runs for seconds.
+	c := New(Config{BaseURL: srv.URL, Timeout: 50 * time.Millisecond})
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+	defer cancel()
+	_, err := c.Fetch(ctx, "KATX")
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
