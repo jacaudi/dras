@@ -6,8 +6,9 @@ ARG TARGETARCH
 ARG TARGETVARIANT=""
 
 ARG VERSION="development"
-ARG BUILDTIME=""
-ARG REVISION=""
+ARG BUILDTIME="unknown"
+ARG REVISION="unknown"
+ARG BRANCH="unknown"
 
 # Set necessary environment variables for Go cross-compilation
 ENV GO111MODULE=on \
@@ -32,8 +33,9 @@ RUN go mod tidy
 RUN go build -ldflags "\
     -X github.com/jacaudi/dras/internal/version.Version=${VERSION} \
     -X github.com/jacaudi/dras/internal/version.BuildTime=${BUILDTIME} \
-    -X github.com/jacaudi/dras/internal/version.GitCommit=${REVISION}" \
-    -o dras main.go
+    -X github.com/jacaudi/dras/internal/version.GitCommit=${REVISION} \
+    -X github.com/jacaudi/dras/internal/version.GitBranch=${BRANCH}" \
+    -o dras .
 
 # Final Stage
 FROM scratch AS final

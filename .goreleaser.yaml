@@ -4,8 +4,13 @@ version: 2
 project_name: dras
 builds:
   - dir: ./dras
-    main: ./main.go
+    main: .
     binary: dras
+    ldflags:
+      - -X github.com/jacaudi/dras/internal/version.Version={{.Version}}
+      - -X github.com/jacaudi/dras/internal/version.BuildTime={{.Date}}
+      - -X github.com/jacaudi/dras/internal/version.GitCommit={{.FullCommit}}
+      - -X github.com/jacaudi/dras/internal/version.GitBranch={{.Branch}}
     env:
       - CGO_ENABLED=0
     goos:

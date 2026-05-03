@@ -98,6 +98,14 @@ jobs:
       # arm64 build to amd64 saves ~20s of arm-runner provisioning.
       arm64-runner: ubuntu-24.04
       version: ${{ needs.release.outputs.new-release-version-v }}
+      # Forward build-time metadata so the binary's startup banner reports
+      # real version/commit/branch values instead of the Dockerfile defaults
+      # ("development" / "unknown"). Closes #82.
+      build-args: |
+        VERSION=${{ needs.release.outputs.new-release-version }}
+        BUILDTIME=${{ github.event.head_commit.timestamp }}
+        REVISION=${{ github.sha }}
+        BRANCH=${{ github.ref_name }}
       tags: |
         ghcr.io/${{ github.repository }}:latest
         ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new-release-version-v }}
