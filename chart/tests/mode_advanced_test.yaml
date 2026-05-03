@@ -9,43 +9,60 @@ chart:
 values:
   - values-advanced.yaml
 tests:
-  - it: renders 1 Service and 2 Deployments (3 docs total)
+  - it: renders 1 Service + 1 Deployment (single-pod sidecar layout)
     asserts:
       - hasDocuments:
-          count: 3
+          count: 2
 
-  - it: dras container has RENDERER_URL pointing at the renderer Service
+  - it: dras container has RENDERER_URL pointing at localhost (intra-pod loopback)
     documentSelector:
-      path: metadata.name
-      value: dras
+      path: kind
+      value: Deployment
     asserts:
-      - isKind:
-          of: Deployment
       - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: RENDERER_URL
-            value: http://dras-renderer.monitoring.svc.cluster.local:8080
+            value: http://localhost:8080
 
-  - it: renderer Deployment container env has S3_BUCKET and AWS_REGION
+  - it: renderer runs as a K8s sidecar (initContainer with restartPolicy Always)
     documentSelector:
-      path: metadata.labels["app.kubernetes.io/controller"]
-      value: renderer
+      path: kind
+      value: Deployment
     asserts:
-      - isKind:
-          of: Deployment
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: dras-lvl2-renderer
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
       - contains:
-          path: spec.template.spec.containers[0].env
+          path: spec.template.spec.initContainers[0].env
           content:
             name: S3_BUCKET
             value: unidata-nexrad-level2-chunks
       - contains:
-          path: spec.template.spec.containers[0].env
+          path: spec.template.spec.initContainers[0].env
           content:
             name: AWS_REGION
             value: us-east-1
 
-  - it: renderer Service is ClusterIP on port 8080
+  - it: renderer sidecar exposes /healthz on 8080 with both probes wired
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.initContainers[0].livenessProbe.httpGet.port
+          value: 8080
+      - equal:
+          path: spec.template.spec.initContainers[0].readinessProbe.httpGet.path
+          value: /healthz
+
+  - it: renderer Service is ClusterIP on port 8080 selecting the dras controller
     documentSelector:
       path: kind
       value: Service
@@ -59,20 +76,39 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 8080
+      - equal:
+          path: spec.selector["app.kubernetes.io/controller"]
+          value: dras
 
-  - it: dras pod mounts /tmp from a pod-scoped emptyDir at subPath dras
+  - it: dras container mounts /tmp at subPath dras
     documentSelector:
-      path: metadata.name
-      value: dras
+      path: kind
+      value: Deployment
     asserts:
-      - isKind:
-          of: Deployment
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
           content:
             mountPath: /tmp
             name: tmp
             subPath: dras
+
+  - it: renderer sidecar mounts /tmp at subPath renderer
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /tmp
+            name: tmp
+            subPath: renderer
+
+  - it: pod-scoped emptyDir volume backs both /tmp mounts
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
       - contains:
           path: spec.template.spec.volumes
           content:
@@ -80,22 +116,11 @@ tests:
             emptyDir:
               sizeLimit: 256Mi
 
-  - it: renderer pod mounts /tmp from a pod-scoped emptyDir at subPath renderer
+  - it: pod runs as uid 65532 (uid-agnostic image after #108)
     documentSelector:
-      path: metadata.labels["app.kubernetes.io/controller"]
-      value: renderer
+      path: kind
+      value: Deployment
     asserts:
-      - isKind:
-          of: Deployment
-      - contains:
-          path: spec.template.spec.containers[0].volumeMounts
-          content:
-            mountPath: /tmp
-            name: tmp
-            subPath: renderer
-      - contains:
-          path: spec.template.spec.volumes
-          content:
-            name: tmp
-            emptyDir:
-              sizeLimit: 256Mi
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 65532

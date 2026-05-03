@@ -1,5 +1,5 @@
-# Headline mode toggle. Drives whether renderer resources are rendered
-# and whether RENDERER_URL is injected into dras' env.
+# Headline mode toggle. Drives whether the renderer container is included
+# in the pod and whether RENDERER_URL is injected into the dras container.
 mode: advanced  # one of: standard | advanced
 
 # Global overrides forwarded to bjw-s/common. Required by app-template's name helpers.
@@ -8,8 +8,8 @@ global: {}
 # Container image refs. This is the operator-facing image-override surface:
 #   helm install --set image.dras.tag=v2.7.0 ...
 # Empty `tag` defaults to .Chart.AppVersion (the unified release tag).
-# The chart helper reads from here and writes through to controllers below;
-# do NOT set `image:` under controllers.<name>.containers.app — those are
+# The chart helper reads from here and writes through to the containers below;
+# do NOT set `image:` under controllers.dras.containers.<name> — those are
 # overridden every render.
 image:
   dras:
@@ -42,6 +42,14 @@ renderer:
     region: us-east-1                     # passed as AWS_REGION env
 
 # ── Pass-through overrides into bjw-s app-template ───────────────────────
+# Single-pod, two-container layout: the renderer (`dras-lvl2-renderer`) and
+# the dras worker (`dras`) share a Pod. dras reaches the renderer over
+# loopback — no Service needed for intra-pod traffic. The split-Deployment
+# layout pre-#109 was hedged for GPU isolation; Py-ART has no GPU path so
+# the split had no payoff and was reversed.
+#
+# Image is uid-agnostic since #108, so a single pod-level securityContext
+# at uid 65532 works for both containers — no per-controller override.
 defaultPodOptions:
   securityContext:
     runAsNonRoot: true
@@ -54,7 +62,7 @@ controllers:
   dras:
     replicas: 1
     containers:
-      app:
+      dras:
         env: {}              # operator-supplied envs merge with chart-managed ones
         resources:
           requests: { cpu: 10m, memory: 32Mi }
@@ -64,43 +72,27 @@ controllers:
           readiness: { enabled: false }
           startup:   { enabled: false }
 
-  renderer:
-    # Stripped before app-template sees values when mode == standard.
-    replicas: 1
-    # The renderer image creates a `renderer` user (UID 10001) and installs
-    # the warmed Cartopy Natural Earth shapefile cache at
-    # /home/renderer/.local/share/cartopy at build time. The chart's
-    # defaultPodOptions runs as UID 65532 ("nobody"), which can't read that
-    # path — every render then re-downloads the shapefiles or falls back
-    # to a non-cached path. Override to UID 10001 here so the cache is
-    # actually used. Issue #103.
-    pod:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 10001
-        runAsGroup: 10001
-        fsGroup: 10001
-        seccompProfile:
-          type: RuntimeDefault
-    containers:
-      app:
+    # Native K8s sidecar pattern (≥1.28): an initContainer with
+    # `restartPolicy: Always` runs alongside the main containers but
+    # starts (and reaches readiness) before them. That guarantees the
+    # renderer is up before dras issues its first request — without it,
+    # dras' polling loop races the renderer's HTTP bind on every fresh
+    # pod.
+    #
+    # Container key here is config-facing. The chart helper renames
+    # `renderer` → `dras-lvl2-renderer` at emit time so the longer
+    # display name surfaces in pod specs (kubectl describe, logs)
+    # without forcing every override path in values.yaml to use the
+    # longer key. Stripped in standard mode.
+    initContainers:
+      renderer:
+        restartPolicy: Always
         ports:
           - name: http
             containerPort: 8080
-        # Belt-and-suspenders: matplotlib defaults its config dir to
-        # ~/.config/matplotlib. With HOME=/ (no /etc/passwd entry for
-        # the runtime UID), it tries to mkdir /.config and fails. Pinning
-        # MPLCONFIGDIR to a writable tmpfs path silences the warning and
-        # avoids the auto-fallback's per-startup recompute.
-        env:
-          - name: MPLCONFIGDIR
-            value: /tmp/matplotlib
         resources:
-          # Bumped to 1.5Gi limit on 2026-05-02 after issue #103. The prior
-          # 768Mi limit OOMKilled (exit 137) on busy stations like KATX
-          # whose Level II volumes peak Py-ART memory >800Mi. Profiled at
-          # ~1.1Gi peak during a render of KATX's largest recent volume;
-          # 1.5Gi gives ~30% headroom.
+          # 1.5Gi limit covers Py-ART peak (~1.1Gi) on busy stations.
+          # See PR #104 history for profiling notes.
           requests: { cpu: 100m, memory: 512Mi }
           limits:   { memory: 1536Mi }
         probes:
@@ -119,57 +111,43 @@ controllers:
               periodSeconds: 10
 
 service:
-  # Stripped before app-template sees values when mode == standard.
-  # suffix: renderer causes bjw-s common to append "-renderer" to the
-  # fullname ("dras"), producing "dras-renderer". Without this, a single-
-  # service chart skips appending the identifier and the Service would be
-  # named "dras" — mismatching the RENDERER_URL DNS name injected by the
-  # _app-template-values.tpl helper.
+  # Stripped in standard mode. Kept in advanced mode for /metrics scraping
+  # and out-of-band debugging via port-forward — not on the dras→renderer
+  # hot path, which is intra-pod over localhost now.
   renderer:
-    controller: renderer
+    controller: dras
     type: ClusterIP
     suffix: renderer
     ports:
       http:
         port: 8080
         protocol: HTTP
+        targetPort: 8080
 
 # ── Volumes ──────────────────────────────────────────────────────────────
 persistence:
-  # Writable /tmp for both controllers. One emptyDir, two subPath mounts —
-  # each container sees its own isolated /tmp under a different subdir of
-  # the shared volume.
+  # Writable /tmp for both containers in the pod. One emptyDir, two subPath
+  # mounts — each container sees its own isolated /tmp under a different
+  # subdir of the shared volume. matplotlib stores its font/config cache at
+  # MPLCONFIGDIR=/tmp/matplotlib (set in the renderer image) and Py-ART/
+  # Cartopy create transient files during a render. dras has no /tmp churn
+  # today but a future change could; subPaths keep the two containers'
+  # tmp namespaces from ever stepping on each other.
   #
-  # Why per-container isolation: matplotlib stores its font/config cache
-  # at MPLCONFIGDIR=/tmp/matplotlib and Py-ART / Cartopy create transient
-  # files during a render. dras has no /tmp churn today but a future
-  # change could; subPaths keep the two containers' tmp namespaces from
-  # ever stepping on each other.
-  #
-  # Why one emptyDir instead of two: a single volume with sizeLimit
-  # caps total /tmp usage across the pod (matters for ephemeral-storage
-  # accounting on the node).
-  #
-  # Why mount /tmp at all: with pod-level `runAsNonRoot: true` and (today)
-  # a writable image rootfs, /tmp works without this mount — but it
-  # breaks the moment anyone hardens the pod with
-  # `readOnlyRootFilesystem: true`. Mounting an emptyDir here makes the
-  # cache lifecycle explicit (cleared on pod restart) and keeps the
-  # rootfs read-only-ready.
-  #
-  # Disk-backed by default. Set `medium: Memory` to switch to a tmpfs
-  # at the cost of subtracting from the pod's memory budget.
+  # Disk-backed by default. Set `medium: Memory` to switch to a tmpfs at
+  # the cost of subtracting from the pod's memory budget.
   tmp:
     enabled: true
     type: emptyDir
     sizeLimit: 256Mi
     advancedMounts:
       dras:
-        app:
+        dras:
           - path: /tmp
             subPath: dras
-      renderer:
-        app:
+        # Renamed alongside the container at emit time. Stripped in
+        # standard mode.
+        renderer:
           - path: /tmp
             subPath: renderer
 
