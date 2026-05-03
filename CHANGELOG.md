@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.8.2](https://github.com/jacaudi/dras/compare/v2.8.1...v2.8.2) (2026-05-03)
+
+### Bug Fixes
+
+* **renderer:** raise clutter floor to 15 dBZ; tighter default zoom; more towns ([36a53e7](https://github.com/jacaudi/dras/commit/36a53e79f3e57e388f977faa48fe0f55c5ec76bb))
+
 ## [2.8.1](https://github.com/jacaudi/dras/compare/v2.8.0...v2.8.1) (2026-05-03)
 
 ### Bug Fixes
