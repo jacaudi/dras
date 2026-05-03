@@ -61,7 +61,11 @@ func TestFetchServerErrorReturnsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(Config{BaseURL: srv.URL, Timeout: 5 * time.Second})
+	// Inject a non-retrying client: this test covers structured-error-body
+	// surfacing, not retry behavior. The default transport retries 503 with
+	// backoff, which races the request timeout and produces a flaky
+	// "context deadline exceeded" instead of the renderer's error code.
+	c := New(Config{BaseURL: srv.URL, HTTPClient: &http.Client{Timeout: 5 * time.Second}})
 	_, err := c.Fetch(t.Context(), "KATX")
 	if err == nil {
 		t.Fatal("expected error")
