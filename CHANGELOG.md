@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.9.0](https://github.com/jacaudi/dras/compare/v2.8.2...v2.9.0) (2026-05-03)
+
+### Features
+
+* **renderer:** freshness improvements — TTL, data_age_seconds, PNG title ([#110](https://github.com/jacaudi/dras/issues/110)) ([c78ebda](https://github.com/jacaudi/dras/commit/c78ebda6907789e6d584915db9f42a47fb25904a))
+
 ## [2.8.2](https://github.com/jacaudi/dras/compare/v2.8.1...v2.8.2) (2026-05-03)
 
 ### Bug Fixes
