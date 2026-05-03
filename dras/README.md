@@ -53,5 +53,6 @@ docker run --rm -e DRYRUN=true -e STATION_IDS=KATX dras:local
 - `internal/monitor` — polling loop, change detection, notification dispatch.
 - `internal/notify` — Pushover client (with attachment support).
 - `internal/radar` — `radar.Data` model, comparison, station-ID utilities.
-- `internal/logger` — structured-ish logger.
 - `internal/version` — build-time version metadata.
+
+Logging uses stdlib `log/slog`, configured in `logging.go` (`LOG_LEVEL`, `LOG_FORMAT`).
