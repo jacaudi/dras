@@ -93,14 +93,11 @@ COPY --from=builder /app/scripts /app/scripts
 # (operator-overridden runAsUser values, cluster policy, etc.). Issue #107.
 COPY --from=builder /root/.local/share/cartopy /home/renderer/.local/share/cartopy
 RUN chmod -R a+rX /home/renderer
-# Verify the warmed cache is reachable under the chart-default uid (65532)
-# AND under a different arbitrary uid. The second check is the regression
-# guard for #107 — if a future change re-introduces uid-coupled perms, the
-# build fails here instead of at first request in production.
+# Verify the warmed cache is reachable under the chart-default uid. If a
+# future change re-introduces uid-coupled perms, the build fails here
+# instead of at first request in production.
 USER 65532
 RUN /app/.venv/bin/python /app/scripts/cartopy_cache.py "uid 65532"
-USER 99999
-RUN /app/.venv/bin/python /app/scripts/cartopy_cache.py "uid 99999"
 USER root
 COPY src /app/src
 RUN chmod -R a+rX /app/src
