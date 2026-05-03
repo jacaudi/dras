@@ -52,10 +52,19 @@ sprig set/unset/dig operate reliably on all nested keys.
         "pullPolicy" $rendImg.pullPolicy) -}}
 {{- end -}}
 
-{{- /* Strip renderer pieces in standard mode */ -}}
+{{- /* Strip renderer pieces in standard mode. Includes any persistence
+     entries' advancedMounts targeting `renderer`, since bjw-s common
+     fails the render with "No enabled controller found with this
+     identifier" when an advancedMounts key references a stripped
+     controller. */ -}}
 {{- if eq .Values.mode "standard" -}}
   {{- $_ := unset $v.controllers "renderer" -}}
   {{- $_ := unset $v.service "renderer" -}}
+  {{- range $persistName, $persist := $v.persistence -}}
+    {{- if $persist.advancedMounts -}}
+      {{- $_ := unset $persist.advancedMounts "renderer" -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- /* Append Pushover envFrom on dras */ -}}
@@ -106,7 +115,18 @@ sprig set/unset/dig operate reliably on all nested keys.
 
   {{- /* renderer: S3_BUCKET, AWS_REGION envs */ -}}
   {{- $rendContainer := $v.controllers.renderer.containers.app -}}
-  {{- $rendEnv := default (list) $rendContainer.env -}}
+  {{- /* Mirror the dras-side env normalization so an operator can supply
+       `env:` as either a map ({FOO: bar}) or a list ([{name: FOO, value: bar}]).
+       Without this, append errors with `Cannot push on type map`. */ -}}
+  {{- $rendExisting := $rendContainer.env -}}
+  {{- $rendEnv := list -}}
+  {{- if kindIs "map" $rendExisting -}}
+    {{- range $k, $val := $rendExisting -}}
+      {{- $rendEnv = append $rendEnv (dict "name" $k "value" $val) -}}
+    {{- end -}}
+  {{- else if $rendExisting -}}
+    {{- $rendEnv = $rendExisting -}}
+  {{- end -}}
   {{- $rendEnv = append $rendEnv (dict "name" "S3_BUCKET" "value" .Values.renderer.s3.bucket) -}}
   {{- $rendEnv = append $rendEnv (dict "name" "AWS_REGION" "value" .Values.renderer.s3.region) -}}
   {{- $_ := set $rendContainer "env" $rendEnv -}}

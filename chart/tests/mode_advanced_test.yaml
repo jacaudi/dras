@@ -59,3 +59,43 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 8080
+
+  - it: dras pod mounts /tmp from a pod-scoped emptyDir at subPath dras
+    documentSelector:
+      path: metadata.name
+      value: dras
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            mountPath: /tmp
+            name: tmp
+            subPath: dras
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 256Mi
+
+  - it: renderer pod mounts /tmp from a pod-scoped emptyDir at subPath renderer
+    documentSelector:
+      path: metadata.labels["app.kubernetes.io/controller"]
+      value: renderer
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            mountPath: /tmp
+            name: tmp
+            subPath: renderer
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: tmp
+            emptyDir:
+              sizeLimit: 256Mi

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jacaudi/dras/internal/httpretry"
 	"github.com/jacaudi/dras/internal/logger"
 )
 
@@ -95,9 +96,17 @@ func New(cfg Config) *Service {
 		retention = DefaultRetention
 	}
 
+	// When no HTTPClient is supplied, install a default that wraps
+	// http.DefaultTransport with httpretry.Transport. This absorbs
+	// transient upstream NWS flakiness — DNS hiccups, 5xx, timeouts
+	// mid-request — without callers seeing them as fetch failures.
+	// Issue #101 / #103.
 	client := cfg.HTTPClient
 	if client == nil {
-		client = &http.Client{Timeout: defaultTimeout}
+		client = &http.Client{
+			Timeout:   defaultTimeout,
+			Transport: httpretry.DefaultTransport(),
+		}
 	}
 
 	return &Service{

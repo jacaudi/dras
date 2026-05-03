@@ -67,14 +67,42 @@ controllers:
   renderer:
     # Stripped before app-template sees values when mode == standard.
     replicas: 1
+    # The renderer image creates a `renderer` user (UID 10001) and installs
+    # the warmed Cartopy Natural Earth shapefile cache at
+    # /home/renderer/.local/share/cartopy at build time. The chart's
+    # defaultPodOptions runs as UID 65532 ("nobody"), which can't read that
+    # path — every render then re-downloads the shapefiles or falls back
+    # to a non-cached path. Override to UID 10001 here so the cache is
+    # actually used. Issue #103.
+    pod:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
     containers:
       app:
         ports:
           - name: http
             containerPort: 8080
+        # Belt-and-suspenders: matplotlib defaults its config dir to
+        # ~/.config/matplotlib. With HOME=/ (no /etc/passwd entry for
+        # the runtime UID), it tries to mkdir /.config and fails. Pinning
+        # MPLCONFIGDIR to a writable tmpfs path silences the warning and
+        # avoids the auto-fallback's per-startup recompute.
+        env:
+          - name: MPLCONFIGDIR
+            value: /tmp/matplotlib
         resources:
-          requests: { cpu: 100m, memory: 384Mi }
-          limits:   { memory: 768Mi }
+          # Bumped to 1.5Gi limit on 2026-05-02 after issue #103. The prior
+          # 768Mi limit OOMKilled (exit 137) on busy stations like KATX
+          # whose Level II volumes peak Py-ART memory >800Mi. Profiled at
+          # ~1.1Gi peak during a render of KATX's largest recent volume;
+          # 1.5Gi gives ~30% headroom.
+          requests: { cpu: 100m, memory: 512Mi }
+          limits:   { memory: 1536Mi }
         probes:
           liveness:
             enabled: true
@@ -106,13 +134,51 @@ service:
         port: 8080
         protocol: HTTP
 
+# ── Volumes ──────────────────────────────────────────────────────────────
+persistence:
+  # Writable /tmp for both controllers. One emptyDir, two subPath mounts —
+  # each container sees its own isolated /tmp under a different subdir of
+  # the shared volume.
+  #
+  # Why per-container isolation: matplotlib stores its font/config cache
+  # at MPLCONFIGDIR=/tmp/matplotlib and Py-ART / Cartopy create transient
+  # files during a render. dras has no /tmp churn today but a future
+  # change could; subPaths keep the two containers' tmp namespaces from
+  # ever stepping on each other.
+  #
+  # Why one emptyDir instead of two: a single volume with sizeLimit
+  # caps total /tmp usage across the pod (matters for ephemeral-storage
+  # accounting on the node).
+  #
+  # Why mount /tmp at all: with pod-level `runAsNonRoot: true` and (today)
+  # a writable image rootfs, /tmp works without this mount — but it
+  # breaks the moment anyone hardens the pod with
+  # `readOnlyRootFilesystem: true`. Mounting an emptyDir here makes the
+  # cache lifecycle explicit (cleared on pod restart) and keeps the
+  # rootfs read-only-ready.
+  #
+  # Disk-backed by default. Set `medium: Memory` to switch to a tmpfs
+  # at the cost of subtracting from the pod's memory budget.
+  tmp:
+    enabled: true
+    type: emptyDir
+    sizeLimit: 256Mi
+    advancedMounts:
+      dras:
+        app:
+          - path: /tmp
+            subPath: dras
+      renderer:
+        app:
+          - path: /tmp
+            subPath: renderer
+
 # ── app-template required top-level stubs ────────────────────────────────
 # app-template/common iterates these keys directly; they must be present as
 # empty maps (not nil) so that range/get operations do not dereference nil.
 configMaps: {}
 ingress: {}
 networkpolicies: {}
-persistence: {}
 rawResources: {}
 rbac: {}
 route: {}
