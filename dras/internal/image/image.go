@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"github.com/jacaudi/dras/internal/httpretry"
-	"github.com/jacaudi/dras/internal/logger"
 )
 
 // DefaultURLTemplate is the default NWS radar image URL pattern. The
@@ -140,10 +140,10 @@ func (s *Service) Fetch(ctx context.Context, stationID string) (*Image, error) {
 	}
 
 	url := s.URLFor(stationID)
-	logger.WithFields(map[string]string{
-		"station": stationID,
-		"url":     url,
-	}).Debug("Fetching radar image")
+	slog.Debug("Fetching radar image",
+		"station", stationID,
+		"url", url,
+	)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -187,12 +187,12 @@ func (s *Service) Fetch(ctx context.Context, stationID string) (*Image, error) {
 	count := len(s.history[stationID])
 	s.mu.Unlock()
 
-	logger.WithFields(map[string]string{
-		"station":      stationID,
-		"bytes":        fmt.Sprintf("%d", len(data)),
-		"content_type": contentType,
-		"history":      fmt.Sprintf("%d", count),
-	}).Debug("Stored radar image")
+	slog.Debug("Stored radar image",
+		"station", stationID,
+		"bytes", fmt.Sprintf("%d", len(data)),
+		"content_type", contentType,
+		"history", fmt.Sprintf("%d", count),
+	)
 
 	return img, nil
 }

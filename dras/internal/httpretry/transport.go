@@ -14,12 +14,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/jacaudi/dras/internal/logger"
 )
 
 // Transport wraps a base http.RoundTripper with bounded retry-with-backoff
@@ -159,19 +158,19 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		wait := backoffFor(attempt, initial, maxBackoff, resp)
 
 		// Log the upcoming retry. Best-effort — never block on logger.
-		fields := map[string]string{
-			"attempt":      strconv.Itoa(attempt),
-			"max_attempts": strconv.Itoa(maxAttempts),
-			"wait_ms":      strconv.FormatInt(wait.Milliseconds(), 10),
-			"url":          req.URL.String(),
+		attrs := []any{
+			"attempt", strconv.Itoa(attempt),
+			"max_attempts", strconv.Itoa(maxAttempts),
+			"wait_ms", strconv.FormatInt(wait.Milliseconds(), 10),
+			"url", req.URL.String(),
 		}
 		if lastErr != nil {
-			fields["err"] = lastErr.Error()
+			attrs = append(attrs, "err", lastErr.Error())
 		}
 		if resp != nil {
-			fields["status"] = strconv.Itoa(resp.StatusCode)
+			attrs = append(attrs, "status", strconv.Itoa(resp.StatusCode))
 		}
-		logger.WithFields(fields).Debug("retrying transient HTTP failure")
+		slog.Debug("retrying transient HTTP failure", attrs...)
 
 		// Drain and close any previous response body so the connection
 		// can be reused, then release the per-attempt context.

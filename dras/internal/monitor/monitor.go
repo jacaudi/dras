@@ -3,12 +3,12 @@ package monitor
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/jacaudi/dras/internal/config"
 	"github.com/jacaudi/dras/internal/image"
-	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
 )
@@ -40,31 +40,31 @@ func New(radarService radar.DataFetcher, notifyService notify.Notifier, imageSer
 func (m *Monitor) Start(ctx context.Context) error {
 	var stationIDs []string
 
-	logger.Info("Starting monitoring service")
+	slog.Info("Starting monitoring service")
 	if m.config.DryRun {
 		stationIDs = []string{"KATX", "KRAX"} // Test with Seattle, WA & Raleigh, NC Radar Sites
-		logger.Info("Running in dry-run mode with test stations: %v", stationIDs)
+		slog.Info(fmt.Sprintf("Running in dry-run mode with test stations: %v", stationIDs))
 	} else {
 		stationIDs = radar.SanitizeStationIDs(m.config.StationInput)
-		logger.Info("Monitoring %d stations: %v", len(stationIDs), stationIDs)
+		slog.Info(fmt.Sprintf("Monitoring %d stations: %v", len(stationIDs), stationIDs))
 	}
 
 	// Initial fetch
-	logger.Info("Performing initial radar data fetch")
+	slog.Info("Performing initial radar data fetch")
 	m.fetchAndReportRadarData(ctx, stationIDs)
 
 	// Set up ticker for periodic updates
 	ticker := time.NewTicker(m.config.CheckInterval)
 	defer ticker.Stop()
 
-	logger.Info("Monitoring started, checking every %v", m.config.CheckInterval)
+	slog.Info(fmt.Sprintf("Monitoring started, checking every %v", m.config.CheckInterval))
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("Monitoring stopped: %v", ctx.Err())
+			slog.Info(fmt.Sprintf("Monitoring stopped: %v", ctx.Err()))
 			return ctx.Err()
 		case <-ticker.C:
-			logger.Debug("Performing periodic radar data update")
+			slog.Debug("Performing periodic radar data update")
 			m.fetchAndReportRadarData(ctx, stationIDs)
 		}
 	}
@@ -83,7 +83,7 @@ func (m *Monitor) fetchAndReportRadarData(ctx context.Context, stationIDs []stri
 		go func(stationID string) {
 			defer wg.Done()
 			if err := m.processStation(ctx, stationID); err != nil {
-				logger.WithField("station", stationID).Error("Failed to process station: %v", err)
+				slog.Error(fmt.Sprintf("Failed to process station: %v", err), "station", stationID)
 			}
 		}(stationID)
 	}
@@ -93,7 +93,7 @@ func (m *Monitor) fetchAndReportRadarData(ctx context.Context, stationIDs []stri
 
 // processStation handles the processing of a single radar station.
 func (m *Monitor) processStation(ctx context.Context, stationID string) error {
-	stationLogger := logger.WithField("station", stationID)
+	stationLogger := slog.Default().With("station", stationID)
 	stationLogger.Debug("Fetching radar data")
 	newRadarData, err := m.radarService.FetchData(stationID)
 	if err != nil {
@@ -125,9 +125,9 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	// Handle first run outside of mutex
 	if isFirstRun {
 		initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
-		stationLogger.Info("Initial radar data stored - %s", initialMessage)
+		stationLogger.Info(fmt.Sprintf("Initial radar data stored - %s", initialMessage))
 		if m.config.DryRun {
-			stationLogger.Debug("Would send startup notification: %s", initialMessage)
+			stationLogger.Debug(fmt.Sprintf("Would send startup notification: %s", initialMessage))
 		} else {
 			attachment := m.attachmentForStation(stationID, radarImage)
 			if err := m.notifyService.SendNotificationWithAttachment(ctx, "DRAS Startup", initialMessage, attachment); err != nil {
@@ -149,16 +149,16 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 
 	changed, changeMessage := radar.CompareData(lastData, newRadarData, alertConfig)
 	if changed {
-		logger.WithFields(map[string]string{
-			"station":      stationID,
-			"station_name": newRadarData.Name,
-			"change":       changeMessage,
-		}).Info("Radar data changed")
+		slog.Info("Radar data changed",
+			"station", stationID,
+			"station_name", newRadarData.Name,
+			"change", changeMessage,
+		)
 
 		vcpChanged := lastData.VCP != newRadarData.VCP
 
 		if m.config.DryRun {
-			stationLogger.Debug("Would send change notification: %s", changeMessage)
+			stationLogger.Debug(fmt.Sprintf("Would send change notification: %s", changeMessage))
 		} else {
 			title := fmt.Sprintf("%s Update", stationID)
 			attachment := m.attachmentForChange(stationID, vcpChanged, radarImage, stationLogger)
@@ -179,14 +179,14 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 
 // fetchRadarImage downloads and caches the latest radar image for the given
 // station. Returns nil if image fetching is disabled or the download fails.
-func (m *Monitor) fetchRadarImage(ctx context.Context, stationID string, stationLogger *logger.FieldLogger) *image.Image {
+func (m *Monitor) fetchRadarImage(ctx context.Context, stationID string, stationLogger *slog.Logger) *image.Image {
 	if m.imageService == nil {
 		return nil
 	}
 
 	img, err := m.imageService.Fetch(ctx, stationID)
 	if err != nil {
-		stationLogger.Warn("Failed to fetch radar image: %v", err)
+		stationLogger.Warn(fmt.Sprintf("Failed to fetch radar image: %v", err))
 		return nil
 	}
 	return img
@@ -195,7 +195,7 @@ func (m *Monitor) fetchRadarImage(ctx context.Context, stationID string, station
 // attachmentForChange returns the radar image to attach to a change
 // notification, or nil when no attachment should be sent. Images are only
 // attached when the VCP changed, matching the user-facing feature scope.
-func (m *Monitor) attachmentForChange(stationID string, vcpChanged bool, justFetched *image.Image, stationLogger *logger.FieldLogger) *notify.Attachment {
+func (m *Monitor) attachmentForChange(stationID string, vcpChanged bool, justFetched *image.Image, stationLogger *slog.Logger) *notify.Attachment {
 	if !vcpChanged {
 		return nil
 	}

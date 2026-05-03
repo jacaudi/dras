@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 
 	"github.com/gregdel/pushover"
-	"github.com/jacaudi/dras/internal/logger"
 	"github.com/nikoksr/notify"
 	pushoverNotify "github.com/nikoksr/notify/service/pushover"
 )
@@ -115,7 +115,7 @@ func (s *Service) SendNotification(ctx context.Context, title, message string) e
 		return err
 	}
 
-	logger.Debug("Pushover notification sent successfully")
+	slog.Debug("Pushover notification sent successfully")
 	return nil
 }
 
@@ -154,6 +154,6 @@ func (s *Service) SendNotificationWithAttachment(ctx context.Context, title, mes
 		}
 	}
 
-	logger.WithField("bytes", fmt.Sprintf("%d", len(attachment.Data))).Debug("Pushover notification with attachment sent successfully")
+	slog.Debug("Pushover notification with attachment sent successfully", "bytes", fmt.Sprintf("%d", len(attachment.Data)))
 	return nil
 }
