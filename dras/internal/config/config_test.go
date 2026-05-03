@@ -262,7 +262,7 @@ func TestRendererURLLoadedFromEnv(t *testing.T) {
 	}
 }
 
-func TestRendererTimeoutDefaultIs30Seconds(t *testing.T) {
+func TestRendererTimeoutDefaultIs60Seconds(t *testing.T) {
 	t.Setenv("PUSHOVER_API_TOKEN", "x")
 	t.Setenv("PUSHOVER_USER_KEY", "x")
 	t.Setenv("STATION_IDS", "KATX")
@@ -271,7 +271,7 @@ func TestRendererTimeoutDefaultIs30Seconds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.RendererTimeout != 30*time.Second {
+	if cfg.RendererTimeout != 60*time.Second {
 		t.Errorf("RendererTimeout = %v", cfg.RendererTimeout)
 	}
 }

@@ -109,7 +109,12 @@ func Load() (*Config, error) {
 
 	cfg.RendererURL = strings.TrimSpace(os.Getenv("RENDERER_URL"))
 
-	cfg.RendererTimeout = 30 * time.Second
+	// 60s default: a cold-start renderer (fresh pod, Py-ART + matplotlib
+	// font cache build on first import) plus a worst-case render of a
+	// busy station's Level II volume can hit ~30–40s. The previous 30s
+	// default tripped Client.Timeout on the first request after a pod
+	// restart. Issue #107 follow-up.
+	cfg.RendererTimeout = 60 * time.Second
 	if v := os.Getenv("RENDERER_TIMEOUT"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil {
