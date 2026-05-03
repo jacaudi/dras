@@ -44,8 +44,8 @@ Error responses use a stable envelope:
 |---|---|---|
 | 400 | `unsupported_product` | Product is not `base_reflectivity`. |
 | 404 | `station_unknown` | Reserved; not currently emitted. |
+| 404 | `no_recent_scan` | No volume present in any slot for the station. |
 | 502 | `decode_failed` | Py-ART couldn't parse the assembled volume. |
-| 503 | `no_recent_scan` | No volume present in any slot for the station. |
 | 500 | `internal` | S3 listing/download failed (mapped from `S3Error`). |
 
 `GET /healthz` — liveness/readiness probe; returns `{"status": "ok", "renderer_version": "..."}`.

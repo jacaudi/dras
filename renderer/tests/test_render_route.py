@@ -51,7 +51,7 @@ def test_render_route_no_recent_volume() -> None:
         client = TestClient(build_app())
         resp = client.get("/render/KATX")
 
-    assert resp.status_code == 503
+    assert resp.status_code == 404
     body = resp.json()
     assert body["error"] == "no_recent_scan"
 

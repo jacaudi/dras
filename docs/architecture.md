@@ -65,8 +65,8 @@ Renderer error envelope: `{"error": "<code>", "detail": "<message>"}`.
 |---|---|---|
 | 400 | `unsupported_product` | Product is not `base_reflectivity`. |
 | 404 | `station_unknown` | Reserved; not currently emitted. |
+| 404 | `no_recent_scan` | No volume present in any slot for the station. |
 | 502 | `decode_failed` | Py-ART couldn't parse the assembled volume. |
-| 503 | `no_recent_scan` | No volume present in any slot for the station. |
 | 500 | `internal` | S3 listing/download failed (mapped from `S3Error`). |
 
 The dras-side renderer client surfaces the code and detail verbatim in its error string.
