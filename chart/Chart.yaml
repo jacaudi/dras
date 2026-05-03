@@ -2,8 +2,8 @@ apiVersion: v2
 name: dras
 description: Helm chart for dras — NEXRAD radar monitoring with optional renderer
 type: application
-version: 2.9.0
-appVersion: v2.9.0
+version: 2.10.0
+appVersion: v2.10.0
 home: https://github.com/jacaudi/dras
 sources:
   - https://github.com/jacaudi/dras
