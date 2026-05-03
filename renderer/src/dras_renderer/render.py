@@ -30,7 +30,11 @@ class RenderOptions:
 
     width: int = 800
     height: int = 800
-    range_km: float = 230.0
+    # 150 km centers the view on the Puget Sound corridor (radar at Camano
+    # Island for KATX) while keeping the inland Cascades and Olympia in
+    # frame. The radar's nominal 230 km range zooms out so far that named
+    # cities are pinpricks and sub-county detail is illegible.
+    range_km: float = 150.0
     dpi: int = 100
 
     # Reflectivity color scale bounds, dBZ.
@@ -47,8 +51,10 @@ class RenderOptions:
     # raw Py-ART ouput, useful for QA / debugging).
     clutter_filter: bool = True
     # Reflectivity floor in dBZ. Anything weaker is suppressed — kills
-    # noise floor + most ground/sea clutter and biota.
-    clutter_min_dbz: float = 5.0
+    # noise floor + most ground/sea clutter and biota. 15 dBZ is a typical
+    # NWS display threshold: keeps moderate-light rain (~drizzle and up)
+    # while rejecting weak biological scatter and sub-precipitation echo.
+    clutter_min_dbz: float = 15.0
     # Cross-correlation coefficient (RhoHV) floor. Real precip is ~>0.95;
     # non-meteorological returns (clutter, biology, AP) drop below ~0.85.
     # Only applied if the field is present (NEXRAD has been dual-pol since
@@ -66,8 +72,10 @@ class RenderOptions:
     show_cities: bool = True
     # SCALERANK is a Natural Earth importance score; lower = bigger city.
     # ≤4 ≈ "regional/global cities only" (Seattle, Tacoma). ≤6 includes
-    # mid-size suburbs (Bellevue, Redmond). 8 includes most named towns.
-    cities_max_scalerank: int = 6
+    # mid-size suburbs (Bellevue, Redmond). 8 includes most named towns
+    # (Renton, Bremerton, Everett, Bellingham, Olympia, Aberdeen). 10 is
+    # the Natural Earth maximum — every named populated place.
+    cities_max_scalerank: int = 8
 
 
 def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
