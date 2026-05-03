@@ -26,6 +26,13 @@ If `RENDERER_URL` is set, basic-mode `RADAR_IMAGE_*` settings are ignored — DR
 | `INTERVAL` | `10` | Poll cadence in **minutes** (integer ≥ 1). |
 | `DRYRUN` | `false` | Disable Pushover; use test stations `KATX`/`KRAX`. |
 
+## Logging
+
+| env | default | meaning |
+|---|---|---|
+| `LOG_LEVEL` | `INFO` | Case-insensitive: `DEBUG`, `INFO`, `WARN` (or `WARNING`), `ERROR`, `FATAL` (mapped to `ERROR`). Unknown values fall back to `INFO`. |
+| `LOG_FORMAT` | `text` | `text` for stdlib `slog.NewTextHandler` (`time=... level=... msg=... k=v`), `json` for `slog.NewJSONHandler` (one JSON object per line). |
+
 ## Alert toggles
 
 Each governs whether a change in that field triggers a notification.

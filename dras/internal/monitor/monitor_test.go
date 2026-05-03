@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/jacaudi/dras/internal/config"
 	"github.com/jacaudi/dras/internal/image"
-	"github.com/jacaudi/dras/internal/logger"
 	"github.com/jacaudi/dras/internal/notify"
 	"github.com/jacaudi/dras/internal/radar"
 	"github.com/jacaudi/dras/internal/renderer"
@@ -21,7 +21,7 @@ import (
 func TestFetchRadarImageNilService(t *testing.T) {
 	m := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), nil, &config.Config{})
 
-	got := m.fetchRadarImage(t.Context(), "KATX", logger.WithField("station", "KATX"))
+	got := m.fetchRadarImage(t.Context(), "KATX", slog.Default().With("station", "KATX"))
 	if got != nil {
 		t.Errorf("fetchRadarImage() = %v, want nil when image service is nil", got)
 	}
@@ -36,7 +36,7 @@ func TestFetchRadarImageReturnsNilOnFailure(t *testing.T) {
 	imgSvc := image.New(image.Config{URLTemplate: server.URL + "/{station}.gif"})
 	m := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), imgSvc, &config.Config{})
 
-	got := m.fetchRadarImage(t.Context(), "KATX", logger.WithField("station", "KATX"))
+	got := m.fetchRadarImage(t.Context(), "KATX", slog.Default().With("station", "KATX"))
 	if got != nil {
 		t.Errorf("fetchRadarImage() = %v, want nil on HTTP failure", got)
 	}
@@ -52,7 +52,7 @@ func TestAttachmentForChange(t *testing.T) {
 
 	imgSvc := image.New(image.Config{URLTemplate: server.URL + "/{station}.gif"})
 	m := New(radar.NewMockDataFetcher(), notify.NewMockNotifier(), imgSvc, &config.Config{})
-	stationLogger := logger.WithField("station", "KATX")
+	stationLogger := slog.Default().With("station", "KATX")
 
 	t.Run("returns nil when VCP did not change", func(t *testing.T) {
 		fresh, err := imgSvc.Fetch(t.Context(), "KATX")

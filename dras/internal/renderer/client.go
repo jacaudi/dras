@@ -10,13 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jacaudi/dras/internal/httpretry"
 	"github.com/jacaudi/dras/internal/image"
-	"github.com/jacaudi/dras/internal/logger"
 )
 
 // Config configures a Client.
@@ -114,10 +114,10 @@ func (c *Client) Fetch(ctx context.Context, stationID string) (*image.Image, err
 	scanTime, err := time.Parse(time.RFC3339, env.Metadata.ScanTime)
 	if err != nil {
 		// Tolerate parse failures: log and use now.
-		logger.WithFields(map[string]string{
-			"station":   stationID,
-			"scan_time": env.Metadata.ScanTime,
-		}).Debug("renderer returned non-RFC3339 scan_time; using now")
+		slog.Debug("renderer returned non-RFC3339 scan_time; using now",
+			"station", stationID,
+			"scan_time", env.Metadata.ScanTime,
+		)
 		scanTime = time.Now().UTC()
 	}
 
