@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.2](https://github.com/jacaudi/dras/compare/v2.7.1...v2.7.2) (2026-05-03)
+
+### Bug Fixes
+
+* **chart,dras:** renderer crash loop and upstream-fetch resilience ([3b256f0](https://github.com/jacaudi/dras/commit/3b256f0f47b403751f549daf308a084a8543fc20)), closes [#103](https://github.com/jacaudi/dras/issues/103) [#101](https://github.com/jacaudi/dras/issues/101) [#103](https://github.com/jacaudi/dras/issues/103) [#101](https://github.com/jacaudi/dras/issues/101) [#103](https://github.com/jacaudi/dras/issues/103) [#101](https://github.com/jacaudi/dras/issues/101)
+* **renderer:** map no_recent_scan to 404 instead of 503 ([#106](https://github.com/jacaudi/dras/issues/106)) ([f0cdf2f](https://github.com/jacaudi/dras/commit/f0cdf2f19315169a8ad827dc3493949811c81c86)), closes [#105](https://github.com/jacaudi/dras/issues/105) [#104](https://github.com/jacaudi/dras/issues/104)
+
 ## [2.7.1](https://github.com/jacaudi/dras/compare/v2.7.0...v2.7.1) (2026-05-02)
 
 ### Bug Fixes
