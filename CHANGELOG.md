@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.7.3](https://github.com/jacaudi/dras/compare/v2.7.2...v2.7.3) (2026-05-03)
+
+### Bug Fixes
+
+* **renderer:** make image uid-agnostic — closes [#107](https://github.com/jacaudi/dras/issues/107) ([#108](https://github.com/jacaudi/dras/issues/108)) ([4a9e359](https://github.com/jacaudi/dras/commit/4a9e359b160b048627e31fc94c6f34387b3fe011)), closes [#101](https://github.com/jacaudi/dras/issues/101)
+
 ## [2.7.2](https://github.com/jacaudi/dras/compare/v2.7.1...v2.7.2) (2026-05-03)
 
 ### Bug Fixes
