@@ -76,6 +76,33 @@ def test_latest_volume_picks_max_chunk_timestamp(mock_bucket: str) -> None:
             "KATX/17/20260429-120500-002-I",
         )
         assert v.latest_chunk_time == datetime(2026, 4, 29, 12, 5, 0, tzinfo=UTC)
+        # moto sets LastModified to "now" at put time.
+        assert v.latest_chunk_uploaded_at.tzinfo is not None
+        assert v.latest_chunk_uploaded_at <= datetime.now(UTC)
+
+
+def test_latest_volume_uploaded_at_is_max_winning_chunk_lastmodified() -> None:
+    """``latest_chunk_uploaded_at`` must equal the max LastModified across the
+    winning slot's filtered chunks."""
+    import time
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=BUCKET)
+        # Two chunks in one slot, with a small delay so LastModified differs.
+        _put_chunk(s3, "KATX/4/20260429-120000-001-S", b"a")
+        time.sleep(0.05)
+        _put_chunk(s3, "KATX/4/20260429-120000-002-I", b"b")
+
+        # Read the actual LastModified of each chunk via list_objects_v2.
+        listing = s3.list_objects_v2(Bucket=BUCKET, Prefix="KATX/4/")
+        last_mods = {entry["Key"]: entry["LastModified"] for entry in listing["Contents"]}
+        expected_max = max(last_mods.values())
+
+        client = _make_client()
+        v = client.latest_volume("KATX")
+        assert v is not None
+        assert v.latest_chunk_uploaded_at == expected_max
 
 
 def test_latest_volume_returns_none_for_unknown_station(mock_bucket: str) -> None:

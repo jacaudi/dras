@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 
 from cachetools import LRUCache
 
@@ -36,6 +36,10 @@ class RenderMetadata:
     elevation_deg: float
     vcp: int
     renderer_version: str
+    # Seconds elapsed between the newest chunk's S3 LastModified and the moment
+    # we (re)entered the rendering step. Recomputed on cache hits so the value
+    # always reflects "right now", not when the PNG was rendered.
+    data_age_at_render: float
 
 
 @dataclass(frozen=True)
@@ -107,7 +111,15 @@ class RenderService:
             cached_png = self._cache.get(req.station, cache_key)
             cached_meta = self._meta.get((req.station, cache_key))
             if cached_png is not None and cached_meta is not None:
-                return RenderResponse(png=cached_png, metadata=cached_meta)
+                # Recompute data_age_at_render so the cached envelope reports
+                # current age, not the age at the time of the original render.
+                fresh_age = (
+                    datetime.now(UTC) - volume.latest_chunk_uploaded_at
+                ).total_seconds()
+                return RenderResponse(
+                    png=cached_png,
+                    metadata=replace(cached_meta, data_age_at_render=fresh_age),
+                )
 
             try:
                 volume_bytes = self._s3.download_volume(volume)
@@ -127,6 +139,10 @@ class RenderService:
                 center_lat=req.center_lat,
                 center_lon=req.center_lon,
             )
+            # Capture render_time as close to the render call as possible so
+            # data_age_at_render reflects the freshness perceived by callers.
+            render_time = datetime.now(UTC)
+            data_age = (render_time - volume.latest_chunk_uploaded_at).total_seconds()
             png = render_base_reflectivity(decoded, opts)
 
             meta = RenderMetadata(
@@ -136,6 +152,7 @@ class RenderService:
                 elevation_deg=decoded.elevation_deg,
                 vcp=decoded.vcp,
                 renderer_version=VERSION,
+                data_age_at_render=data_age,
             )
             self._cache.set(req.station, cache_key, png)
             self._meta[(req.station, cache_key)] = meta
