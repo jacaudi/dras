@@ -32,7 +32,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.initContainers[0].name
-          value: dras-lvl2-renderer
+          value: renderer
       - equal:
           path: spec.template.spec.initContainers[0].restartPolicy
           value: Always
@@ -47,17 +47,20 @@ tests:
             name: AWS_REGION
             value: us-east-1
 
-  - it: renderer sidecar exposes /healthz on 8080 with both probes wired
+  - it: renderer sidecar startup probe gates dras on /healthz Ready
     documentSelector:
       path: kind
       value: Deployment
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[0].livenessProbe.httpGet.path
+          path: spec.template.spec.initContainers[0].startupProbe.httpGet.path
           value: /healthz
       - equal:
-          path: spec.template.spec.initContainers[0].livenessProbe.httpGet.port
+          path: spec.template.spec.initContainers[0].startupProbe.httpGet.port
           value: 8080
+      - equal:
+          path: spec.template.spec.initContainers[0].livenessProbe.httpGet.path
+          value: /healthz
       - equal:
           path: spec.template.spec.initContainers[0].readinessProbe.httpGet.path
           value: /healthz

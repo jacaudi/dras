@@ -74,16 +74,14 @@ controllers:
 
     # Native K8s sidecar pattern (≥1.28): an initContainer with
     # `restartPolicy: Always` runs alongside the main containers but
-    # starts (and reaches readiness) before them. That guarantees the
-    # renderer is up before dras issues its first request — without it,
-    # dras' polling loop races the renderer's HTTP bind on every fresh
-    # pod.
+    # the kubelet waits for its `startupProbe` to succeed before
+    # starting the next container (here, dras). That's the gate that
+    # eliminates the cold-start race — dras only begins polling once
+    # the renderer's HTTP listener is verifiably serving /healthz.
+    # Without a startupProbe the kubelet only waits for the process to
+    # launch (PID 1 alive), which says nothing about the listener.
     #
-    # Container key here is config-facing. The chart helper renames
-    # `renderer` → `dras-lvl2-renderer` at emit time so the longer
-    # display name surfaces in pod specs (kubectl describe, logs)
-    # without forcing every override path in values.yaml to use the
-    # longer key. Stripped in standard mode.
+    # Stripped in standard mode.
     initContainers:
       renderer:
         restartPolicy: Always
@@ -96,6 +94,16 @@ controllers:
           requests: { cpu: 100m, memory: 512Mi }
           limits:   { memory: 1536Mi }
         probes:
+          # Gate on this: dras doesn't start until /healthz is 200.
+          # ~5s × 30 = 150s budget covers cold Py-ART/matplotlib
+          # import and font cache warm; failures bounce the sidecar.
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet: { path: /healthz, port: 8080 }
+              periodSeconds: 5
+              failureThreshold: 30
           liveness:
             enabled: true
             custom: true

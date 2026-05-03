@@ -9,11 +9,7 @@ Responsibilities of this helper:
   4. Append STATION_IDS / INTERVAL envs to the dras container.
   5. (Advanced mode only) Append RENDERER_URL on dras + S3_BUCKET/AWS_REGION
      on the renderer sidecar.
-  6. Rename the `renderer` initContainer key (and its persistence
-     advancedMounts entry) to `dras-lvl2-renderer` at emit time. The
-     longer display name surfaces in pod specs without polluting
-     values.yaml's override paths.
-  7. Cross-field validation that JSON schema can't express.
+  6. Cross-field validation that JSON schema can't express.
 
 Implementation note: the .Values | toYaml | fromYaml round-trip converts
 common.Values typed nested maps into plain map[string]interface{} so that
@@ -150,25 +146,6 @@ reversed.
   {{- $rendEnv = append $rendEnv (dict "name" "AWS_REGION" "value" .Values.renderer.s3.region) -}}
   {{- $_ := set $rendContainer "env" $rendEnv -}}
 
-{{- end -}}
-
-{{- /* Final-pass rename: the values.yaml-facing key is `renderer`, but the
-     rendered pod spec must show `dras-lvl2-renderer` as the container's
-     display name. Same rename applies to the persistence advancedMounts
-     entry under controller `dras`. */ -}}
-{{- if and (hasKey $v.controllers.dras "initContainers") (hasKey $v.controllers.dras.initContainers "renderer") -}}
-  {{- $rend := index $v.controllers.dras.initContainers "renderer" -}}
-  {{- $_ := set $v.controllers.dras.initContainers "dras-lvl2-renderer" $rend -}}
-  {{- $_ := unset $v.controllers.dras.initContainers "renderer" -}}
-  {{- range $persistName, $persist := $v.persistence -}}
-    {{- if and $persist.advancedMounts $persist.advancedMounts.dras -}}
-      {{- if hasKey $persist.advancedMounts.dras "renderer" -}}
-        {{- $mount := index $persist.advancedMounts.dras "renderer" -}}
-        {{- $_ := set $persist.advancedMounts.dras "dras-lvl2-renderer" $mount -}}
-        {{- $_ := unset $persist.advancedMounts.dras "renderer" -}}
-      {{- end -}}
-    {{- end -}}
-  {{- end -}}
 {{- end -}}
 
 {{ toYaml $v }}
