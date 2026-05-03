@@ -2,6 +2,7 @@ package version
 
 import (
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -123,5 +124,88 @@ func TestDefaultValues(t *testing.T) {
 	}
 	if GoVersion != runtime.Version() {
 		t.Errorf("Expected GoVersion to be %s, got %s", runtime.Version(), GoVersion)
+	}
+}
+
+func TestResolveInfo(t *testing.T) {
+	const (
+		fakeRev  = "deadbeefcafebabe1234567890abcdef00000000"
+		fakeTime = "2026-05-03T15:00:00Z"
+	)
+	tests := []struct {
+		name                                    string
+		version, buildTime, commit, branch, gov string
+		bi                                      *debug.BuildInfo
+		want                                    Info
+	}{
+		{
+			name:    "ldflags-set values win over VCS info",
+			version: "2.9.0", buildTime: "2026-05-03T14:00:00Z",
+			commit: "abc123", branch: "main", gov: "go1.24.0",
+			bi: &debug.BuildInfo{
+				Main: debug.Module{Version: "v9.9.9"},
+				Settings: []debug.BuildSetting{
+					{Key: "vcs.revision", Value: fakeRev},
+					{Key: "vcs.time", Value: fakeTime},
+				},
+			},
+			want: Info{Version: "2.9.0", BuildTime: "2026-05-03T14:00:00Z", GitCommit: "abc123", GitBranch: "main", GoVersion: "go1.24.0"},
+		},
+		{
+			name:    "VCS revision/time fill in when ldflags are default",
+			version: "development", buildTime: "unknown",
+			commit: "unknown", branch: "unknown", gov: "go1.24.0",
+			bi: &debug.BuildInfo{
+				Main: debug.Module{Version: "(devel)"},
+				Settings: []debug.BuildSetting{
+					{Key: "vcs.revision", Value: fakeRev},
+					{Key: "vcs.time", Value: fakeTime},
+				},
+			},
+			want: Info{Version: "development", BuildTime: fakeTime, GitCommit: fakeRev, GitBranch: "unknown", GoVersion: "go1.24.0"},
+		},
+		{
+			name:    "module path version fills in when ldflag Version is default",
+			version: "development", buildTime: "unknown", commit: "unknown", branch: "unknown", gov: "go1.24.0",
+			bi: &debug.BuildInfo{
+				Main:     debug.Module{Version: "v1.2.3"},
+				Settings: nil,
+			},
+			want: Info{Version: "1.2.3", BuildTime: "unknown", GitCommit: "unknown", GitBranch: "unknown", GoVersion: "go1.24.0"},
+		},
+		{
+			name:    "nil BuildInfo returns inputs verbatim",
+			version: "development", buildTime: "unknown", commit: "unknown", branch: "unknown", gov: "go1.24.0",
+			bi:   nil,
+			want: Info{Version: "development", BuildTime: "unknown", GitCommit: "unknown", GitBranch: "unknown", GoVersion: "go1.24.0"},
+		},
+		{
+			name:    "(devel) module version is ignored",
+			version: "development", buildTime: "unknown", commit: "unknown", branch: "unknown", gov: "go1.24.0",
+			bi: &debug.BuildInfo{
+				Main: debug.Module{Version: "(devel)"},
+			},
+			want: Info{Version: "development", BuildTime: "unknown", GitCommit: "unknown", GitBranch: "unknown", GoVersion: "go1.24.0"},
+		},
+		{
+			name:    "empty VCS values do not overwrite",
+			version: "development", buildTime: "unknown", commit: "unknown", branch: "unknown", gov: "go1.24.0",
+			bi: &debug.BuildInfo{
+				Settings: []debug.BuildSetting{
+					{Key: "vcs.revision", Value: ""},
+					{Key: "vcs.time", Value: ""},
+				},
+			},
+			want: Info{Version: "development", BuildTime: "unknown", GitCommit: "unknown", GitBranch: "unknown", GoVersion: "go1.24.0"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveInfo(tt.version, tt.buildTime, tt.commit, tt.branch, tt.gov, tt.bi)
+			if got != tt.want {
+				t.Errorf("resolveInfo() = %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
