@@ -29,7 +29,7 @@ from dras_renderer.version import VERSION
 # HTTP status mapping per ServiceError.code.
 _STATUS_FOR_CODE: dict[str, int] = {
     "station_unknown": 404,
-    "no_recent_scan": 503,
+    "no_recent_scan": 404,
     "decode_failed": 502,
     "unsupported_product": 400,
     "internal": 500,
