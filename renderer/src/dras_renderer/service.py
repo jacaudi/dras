@@ -23,6 +23,9 @@ class RenderRequest:
     range_km: float = 230.0
     width: int = 800
     height: int = 800
+    # Optional view-center override. None means "center on the radar".
+    center_lat: float | None = None
+    center_lon: float | None = None
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,11 @@ class RenderMetadata:
 class RenderResponse:
     png: bytes
     metadata: RenderMetadata
+
+
+def _fmt_coord(v: float | None) -> str:
+    """Format a coord for the cache key. ``None`` → ``"-"``."""
+    return "-" if v is None else f"{v:.3f}"
 
 
 class ServiceError(Exception):
@@ -87,8 +95,15 @@ class RenderService:
                 )
 
             # The volume's latest_chunk_time uniquely identifies a snapshot
-            # (volume slot numbers are reused). Use ISO timestamp as the cache key.
-            cache_key = volume.latest_chunk_time.isoformat()
+            # (volume slot numbers are reused). Cache key folds in render
+            # parameters that change pixel output — different center/range/
+            # size combos must not share a cache slot.
+            cache_key = (
+                f"{volume.latest_chunk_time.isoformat()}"
+                f"|{req.width}x{req.height}"
+                f"|r{req.range_km:.1f}"
+                f"|c{_fmt_coord(req.center_lat)},{_fmt_coord(req.center_lon)}"
+            )
             cached_png = self._cache.get(req.station, cache_key)
             cached_meta = self._meta.get((req.station, cache_key))
             if cached_png is not None and cached_meta is not None:
@@ -105,7 +120,13 @@ class RenderService:
             except ValueError as exc:
                 raise ServiceError("decode_failed", str(exc)) from exc
 
-            opts = RenderOptions(width=req.width, height=req.height, range_km=req.range_km)
+            opts = RenderOptions(
+                width=req.width,
+                height=req.height,
+                range_km=req.range_km,
+                center_lat=req.center_lat,
+                center_lon=req.center_lon,
+            )
             png = render_base_reflectivity(decoded, opts)
 
             meta = RenderMetadata(

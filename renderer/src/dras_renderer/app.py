@@ -24,6 +24,7 @@ from dras_renderer.service import (
     RenderService,
     ServiceError,
 )
+from dras_renderer.station_views import resolve as resolve_station_view
 from dras_renderer.version import VERSION
 
 # HTTP status mapping per ServiceError.code.
@@ -70,14 +71,31 @@ def build_app(config: Config | None = None) -> FastAPI:
         range_km: float = Query(230.0, ge=10.0, le=460.0),
         width: int = Query(800, ge=200, le=4000),
         height: int = Query(800, ge=200, le=4000),
+        # Optional center override (decimal degrees, WGS84). When omitted
+        # the view centers on the radar.
+        center_lat: float | None = Query(None, ge=-90.0, le=90.0),
+        center_lon: float | None = Query(None, ge=-180.0, le=180.0),
+        # Named view preset, e.g. ``view=metro``. When set, its overrides
+        # take precedence over center_lat/center_lon/range_km. Unknown
+        # combos resolve to no override (radar-centered default).
+        view: str | None = Query(None, max_length=32),
     ) -> RenderEnvelope:
         svc = cast(RenderService, request.app.state.service)
+
+        preset = resolve_station_view(station, view)
+        if preset is not None:
+            center_lat = preset.center_lat
+            center_lon = preset.center_lon
+            range_km = preset.range_km
+
         req = RenderRequest(
             station=station.upper(),
             product=product,
             range_km=range_km,
             width=width,
             height=height,
+            center_lat=center_lat,
+            center_lon=center_lon,
         )
         start = time.perf_counter()
         try:

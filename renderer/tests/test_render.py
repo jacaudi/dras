@@ -43,6 +43,27 @@ def test_render_respects_range_km(decoded: DecodedScan) -> None:
     assert img_a.size == img_b.size
 
 
+def test_render_center_override_changes_output(decoded: DecodedScan) -> None:
+    """Recentering on a different point produces a visually different image
+    even at the same range — the basemap and PPI clip differently."""
+    radar_centered = render_base_reflectivity(
+        decoded, RenderOptions(range_km=70.0)
+    )
+    seattle_centered = render_base_reflectivity(
+        decoded,
+        RenderOptions(range_km=70.0, center_lat=47.61, center_lon=-122.33),
+    )
+    assert radar_centered != seattle_centered
+
+
+def test_render_clutter_filter_changes_output(decoded: DecodedScan) -> None:
+    """Disabling the clutter filter must produce a different image —
+    otherwise we'd know the filter is silently a no-op."""
+    filtered = render_base_reflectivity(decoded, RenderOptions(clutter_filter=True))
+    raw = render_base_reflectivity(decoded, RenderOptions(clutter_filter=False))
+    assert filtered != raw
+
+
 def test_matplotlib_uses_agg_backend() -> None:
     """matplotlib.use('Agg') in render.py must select the Agg backend at import time.
 

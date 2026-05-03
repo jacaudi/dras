@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 # Headless backend MUST be selected before importing pyplot. ``matplotlib.use``
 # is authoritative — it overrides the env-var-based detection that runs at
@@ -15,6 +16,7 @@ matplotlib.use("Agg")
 
 import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import cartopy.feature as cfeature  # type: ignore[import-untyped]
+import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt
 import pyart  # type: ignore[import-untyped]
 
@@ -34,6 +36,38 @@ class RenderOptions:
     vmin: float = -20.0
     vmax: float = 75.0
 
+    # View center. Default (None, None) centers on the radar location.
+    # Override to re-center on a metro area or arbitrary point — the PPI
+    # is plotted in full and ``set_extent`` clips the visible region.
+    center_lat: float | None = None
+    center_lon: float | None = None
+
+    # Clutter filter. Set ``clutter_filter=False`` to disable (renders the
+    # raw Py-ART ouput, useful for QA / debugging).
+    clutter_filter: bool = True
+    # Reflectivity floor in dBZ. Anything weaker is suppressed — kills
+    # noise floor + most ground/sea clutter and biota.
+    clutter_min_dbz: float = 5.0
+    # Cross-correlation coefficient (RhoHV) floor. Real precip is ~>0.95;
+    # non-meteorological returns (clutter, biology, AP) drop below ~0.85.
+    # Only applied if the field is present (NEXRAD has been dual-pol since
+    # the 2013 upgrade — every operational radar carries it).
+    clutter_min_rhohv: float = 0.85
+    # Despeckle: drop isolated gates smaller than this many connected
+    # cells. 10 is conservative; raise to be more aggressive.
+    despeckle_size: int = 10
+
+    # Map enrichment toggles (cities are the biggest contributor to
+    # render time among these, mostly because populated_places is the
+    # largest pre-warmed shapefile).
+    show_lakes: bool = True
+    show_borders: bool = True
+    show_cities: bool = True
+    # SCALERANK is a Natural Earth importance score; lower = bigger city.
+    # ≤4 ≈ "regional/global cities only" (Seattle, Tacoma). ≤6 includes
+    # mid-size suburbs (Bellevue, Redmond). 8 includes most named towns.
+    cities_max_scalerank: int = 6
+
 
 def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
     """Render the lowest-tilt base reflectivity as a PPI on a Cartopy basemap.
@@ -46,24 +80,49 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
     )
     try:
         radar = scan.radar
-        lat = float(radar.latitude["data"][0])
-        lon = float(radar.longitude["data"][0])
+        radar_lat = float(radar.latitude["data"][0])
+        radar_lon = float(radar.longitude["data"][0])
 
-        projection = ccrs.LambertConformal(central_latitude=lat, central_longitude=lon)
+        center_lat = opts.center_lat if opts.center_lat is not None else radar_lat
+        center_lon = opts.center_lon if opts.center_lon is not None else radar_lon
+
+        projection = ccrs.LambertConformal(
+            central_latitude=center_lat,
+            central_longitude=center_lon,
+        )
         ax = fig.add_subplot(1, 1, 1, projection=projection)
 
         # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
         # cos(lat) correction the east-west extent stretches by 33% at KATX
         # (lat ~48°) and ~50% at high-latitude AK stations.
         delta_lat = opts.range_km / 111.0
-        delta_lon = delta_lat / max(math.cos(math.radians(lat)), 1e-6)
-        ax.set_extent(
-            [lon - delta_lon, lon + delta_lon, lat - delta_lat, lat + delta_lat],
-            crs=ccrs.PlateCarree(),
+        delta_lon = delta_lat / max(math.cos(math.radians(center_lat)), 1e-6)
+        extent = (
+            center_lon - delta_lon,
+            center_lon + delta_lon,
+            center_lat - delta_lat,
+            center_lat + delta_lat,
         )
+        ax.set_extent(extent, crs=ccrs.PlateCarree())
 
+        # Basemap layers, drawn from bottom up.
+        if opts.show_lakes:
+            ax.add_feature(
+                cfeature.LAKES.with_scale("50m"),
+                facecolor="none",
+                edgecolor="#4a6da7",
+                linewidth=0.4,
+            )
         ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
         ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
+        if opts.show_borders:
+            ax.add_feature(
+                cfeature.BORDERS.with_scale("50m"),
+                edgecolor="gray",
+                linewidth=0.5,
+            )
+
+        gatefilter = _build_clutter_filter(radar, opts) if opts.clutter_filter else None
 
         display = pyart.graph.RadarMapDisplay(radar)
         # sweep=0 == lowest tilt: Py-ART sorts sweeps by ascending elevation.
@@ -71,6 +130,7 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
             "reflectivity",
             sweep=0,
             ax=ax,
+            gatefilter=gatefilter,
             colorbar_flag=False,
             title_flag=True,
             vmin=opts.vmin,
@@ -78,6 +138,9 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
             cmap="pyart_NWSRef",
             embellish=False,  # We add our own basemap features above.
         )
+
+        if opts.show_cities:
+            _add_cities(ax, extent, max_scalerank=opts.cities_max_scalerank)
 
         buf = io.BytesIO()
         # IMPORTANT: do NOT pass bbox_inches="tight" — it crops to content
@@ -88,3 +151,86 @@ def render_base_reflectivity(scan: DecodedScan, opts: RenderOptions) -> bytes:
         return buf.getvalue()
     finally:
         plt.close(fig)
+
+
+def _build_clutter_filter(radar, opts: RenderOptions):
+    """Construct a Py-ART GateFilter for non-meteorological echo removal.
+
+    Stack:
+      1. exclude_invalid: drops missing/masked gates outright.
+      2. exclude_below(reflectivity, ~5 dBZ): kills noise floor and most
+         clutter, biology, and weak returns.
+      3. exclude_below(cross_correlation_ratio, ~0.85): the dual-pol
+         "is this meteorological?" test. Real precip >~0.95; non-met <~0.85.
+      4. despeckle_field: drops isolated single-gate noise pixels left
+         over after the threshold passes.
+    """
+    gf = pyart.filters.GateFilter(radar)
+    gf.exclude_invalid("reflectivity")
+    gf.exclude_below("reflectivity", opts.clutter_min_dbz)
+    if "cross_correlation_ratio" in radar.fields:
+        gf.exclude_below("cross_correlation_ratio", opts.clutter_min_rhohv)
+    pyart.correct.despeckle_field(
+        radar, "reflectivity", gatefilter=gf, size=opts.despeckle_size
+    )
+    return gf
+
+
+@lru_cache(maxsize=1)
+def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
+    """Load Natural Earth populated_places once.
+
+    Returns a tuple of (lon, lat, name, scalerank) tuples. Caching avoids
+    re-reading the shapefile on every render — the file is small but the
+    repeated I/O + shapely geometry construction is wasteful.
+    """
+    path = shapereader.natural_earth(
+        category="cultural", name="populated_places", resolution="10m"
+    )
+    out: list[tuple[float, float, str, int]] = []
+    for record in shapereader.Reader(path).records():
+        attrs = record.attributes
+        name = attrs.get("NAME") or attrs.get("name")
+        if not name:
+            continue
+        # SCALERANK is the Natural Earth "global importance" rank; lower
+        # = more prominent. 10 is the missing/sentinel value.
+        try:
+            scalerank = int(attrs.get("SCALERANK", 99))
+        except (TypeError, ValueError):
+            scalerank = 99
+        geom = record.geometry
+        out.append((float(geom.x), float(geom.y), str(name), scalerank))
+    return tuple(out)
+
+
+def _add_cities(ax, extent, max_scalerank: int) -> None:
+    """Plot Natural Earth populated places that lie inside the extent.
+
+    Filters by SCALERANK so dense metros don't drown the map in labels.
+    """
+    west, east, south, north = extent
+    for lon0, lat0, name, scalerank in _populated_places_records():
+        if scalerank > max_scalerank:
+            continue
+        if not (west <= lon0 <= east and south <= lat0 <= north):
+            continue
+        ax.plot(
+            lon0,
+            lat0,
+            "o",
+            markersize=2.5,
+            color="black",
+            transform=ccrs.PlateCarree(),
+            zorder=5,
+        )
+        ax.text(
+            lon0 + 0.04,
+            lat0 + 0.02,
+            name,
+            fontsize=7,
+            color="black",
+            transform=ccrs.PlateCarree(),
+            zorder=5,
+            clip_on=True,
+        )

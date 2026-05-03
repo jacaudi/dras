@@ -44,11 +44,17 @@ RUN uv sync --frozen --no-dev
 
 # Pre-warm the Cartopy Natural Earth cache so first request is fast. Cartopy
 # stores under ~/.local/share/cartopy by default; we run as root in this stage
-# so it lands in /root/.local/share/cartopy.
+# so it lands in /root/.local/share/cartopy. populated_places@10m is fetched
+# at the cultural-shapereader level, not via cfeature, because cfeature
+# doesn't ship a built-in populated-places feature.
 RUN /app/.venv/bin/python -c "\
 import cartopy.feature as cf;\
+import cartopy.io.shapereader as shp;\
 list(cf.STATES.with_scale('50m').geometries());\
 list(cf.COASTLINE.with_scale('50m').geometries());\
+list(cf.LAKES.with_scale('50m').geometries());\
+list(cf.BORDERS.with_scale('50m').geometries());\
+shp.natural_earth(category='cultural', name='populated_places', resolution='10m');\
 print('cartopy cache warmed')\
 "
 
@@ -101,18 +107,26 @@ RUN chmod -R go+rX /home/renderer
 USER renderer
 RUN /app/.venv/bin/python -c "\
 import cartopy.feature as cf;\
+import cartopy.io.shapereader as shp;\
 states=list(cf.STATES.with_scale('50m').geometries());\
 coast=list(cf.COASTLINE.with_scale('50m').geometries());\
-assert states and coast, 'cartopy cache copy is empty or unreachable';\
-print(f'cartopy cache verified (uid renderer): {len(states)} states, {len(coast)} coastline features')\
+lakes=list(cf.LAKES.with_scale('50m').geometries());\
+borders=list(cf.BORDERS.with_scale('50m').geometries());\
+cities=list(shp.Reader(shp.natural_earth(category='cultural', name='populated_places', resolution='10m')).records());\
+assert states and coast and lakes and borders and cities, 'cartopy cache copy is empty or unreachable';\
+print(f'cartopy cache verified (uid renderer): {len(states)} states, {len(coast)} coast, {len(lakes)} lakes, {len(borders)} borders, {len(cities)} cities')\
 "
 USER 65532
 RUN /app/.venv/bin/python -c "\
 import cartopy.feature as cf;\
+import cartopy.io.shapereader as shp;\
 states=list(cf.STATES.with_scale('50m').geometries());\
 coast=list(cf.COASTLINE.with_scale('50m').geometries());\
-assert states and coast, 'cartopy cache unreachable under unknown uid';\
-print(f'cartopy cache verified (uid 65532): {len(states)} states, {len(coast)} coastline features')\
+lakes=list(cf.LAKES.with_scale('50m').geometries());\
+borders=list(cf.BORDERS.with_scale('50m').geometries());\
+cities=list(shp.Reader(shp.natural_earth(category='cultural', name='populated_places', resolution='10m')).records());\
+assert states and coast and lakes and borders and cities, 'cartopy cache unreachable under unknown uid';\
+print(f'cartopy cache verified (uid 65532): {len(states)} states, {len(coast)} coast, {len(lakes)} lakes, {len(borders)} borders, {len(cities)} cities')\
 "
 USER root
 COPY --chown=renderer:renderer src /app/src
