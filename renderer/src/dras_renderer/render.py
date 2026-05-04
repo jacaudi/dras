@@ -21,7 +21,7 @@ import pyart  # type: ignore[import-untyped]
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
-from dras_renderer import basemap
+from dras_renderer import basemap, furniture
 from dras_renderer.decode import DecodedScan
 
 
@@ -219,6 +219,9 @@ def _render_figure(
             opts.cities_max_scalerank,
             deconflict=opts.deconflict_labels,
         )
+
+    if opts.show_colorbar:
+        furniture.add_colorbar(ax, opts)
 
     return fig, ax
 
