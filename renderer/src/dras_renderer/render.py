@@ -182,7 +182,14 @@ def _render_figure(
     if opts.show_counties:
         basemap.add_counties(ax)
 
-    # Basemap layers, drawn from bottom up.
+    # Remaining basemap layers, in the design z-order:
+    # states → roads → coastline → lakes (outlined) → borders.
+    # Lakes come after coastline so their outline isn't cut by the
+    # coastline stroke where they touch the shore.
+    ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
+    if opts.show_roads:
+        basemap.add_roads(ax, extent)
+    ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
     if opts.show_lakes:
         ax.add_feature(
             cfeature.LAKES.with_scale("50m"),
@@ -190,10 +197,6 @@ def _render_figure(
             edgecolor="#4a6da7",
             linewidth=0.4,
         )
-    ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
-    if opts.show_roads:
-        basemap.add_roads(ax, extent)
-    ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
     if opts.show_borders:
         ax.add_feature(
             cfeature.BORDERS.with_scale("50m"),
