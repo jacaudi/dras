@@ -178,6 +178,8 @@ def _render_figure(
             linewidth=0.4,
         )
     ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
+    if opts.show_roads:
+        basemap.add_roads(ax, extent)
     ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
     if opts.show_borders:
         ax.add_feature(

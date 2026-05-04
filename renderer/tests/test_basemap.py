@@ -60,3 +60,28 @@ def test_add_counties_adds_artist() -> None:
         assert len(ax._children) > baseline
     finally:
         plt.close(fig)
+
+
+def test_add_roads_filters_by_class() -> None:
+    """Only Major and Secondary Highway classes are rendered (no local
+    or unclassified roads)."""
+    from dras_renderer.basemap import _road_records
+
+    _road_records.cache_clear()
+    records = _road_records()
+    classes = {cls for _, cls in records}
+    # NE roads dataset uses these top-level types we keep:
+    assert classes <= {"Major Highway", "Secondary Highway", "Beltway", "Bypass"}
+
+
+def test_add_roads_adds_artist_when_extent_contains_roads() -> None:
+    """Calling add_roads over a US metro extent adds at least one feature."""
+    from dras_renderer.basemap import add_roads
+
+    fig, ax = _make_axes()
+    try:
+        baseline = len(ax._children)
+        add_roads(ax, extent=(-123.0, -121.5, 47.0, 48.5))  # KATX metro
+        assert len(ax._children) > baseline
+    finally:
+        plt.close(fig)

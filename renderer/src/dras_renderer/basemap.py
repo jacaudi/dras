@@ -16,6 +16,7 @@ import cartopy.io.shapereader as shapereader
 from cartopy.feature import ShapelyFeature
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
+from shapely.geometry import box as _shapely_box
 
 # Color palette — single source of truth for the renderer's look.
 LAND_COLOR = "#f5f0e6"      # warm cream
@@ -88,3 +89,74 @@ def add_counties(ax: Axes) -> None:
         linewidth=0.3,
     )
     ax.add_feature(feat, zorder=2)
+
+
+# Road classes we keep (filters out local/residential/unclassified). The
+# Natural Earth roads dataset's "type" attribute uses these category names.
+_KEEP_ROAD_CLASSES = frozenset(
+    {"Major Highway", "Secondary Highway", "Beltway", "Bypass"}
+)
+_INTERSTATE_CLASSES = frozenset({"Major Highway", "Beltway"})
+
+
+@lru_cache(maxsize=1)
+def _road_records() -> tuple:
+    """Load Natural Earth roads (10m), cached. Returns ((geometry, class), ...)."""
+    path = shapereader.natural_earth(
+        category="cultural", name="roads", resolution="10m"
+    )
+    out: list[tuple] = []
+    for record in shapereader.Reader(path).records():
+        attrs = record.attributes
+        road_class = attrs.get("type") or attrs.get("TYPE") or ""
+        if road_class not in _KEEP_ROAD_CLASSES:
+            continue
+        out.append((record.geometry, road_class))
+    return tuple(out)
+
+
+def add_roads(
+    ax: Axes, extent: tuple[float, float, float, float]
+) -> None:
+    """Draw highways inside ``extent``: interstates dull-red, others gray.
+
+    Geometries are pre-filtered against ``extent`` with a shapely box so
+    we don't ask matplotlib to draw segments that fall entirely outside
+    the visible area.
+    """
+    west, east, south, north = extent
+    bbox = _shapely_box(west, south, east, north)
+
+    interstates: list = []
+    secondaries: list = []
+    for geom, road_class in _road_records():
+        if not geom.intersects(bbox):
+            continue
+        if road_class in _INTERSTATE_CLASSES:
+            interstates.append(geom)
+        else:
+            secondaries.append(geom)
+
+    if secondaries:
+        ax.add_feature(
+            ShapelyFeature(
+                secondaries,
+                ccrs.PlateCarree(),
+                facecolor="none",
+                edgecolor=SECONDARY_ROAD_COLOR,
+                linewidth=0.5,
+            ),
+            zorder=4,
+        )
+    if interstates:
+        # Drawn after secondaries so interstates win at intersections.
+        ax.add_feature(
+            ShapelyFeature(
+                interstates,
+                ccrs.PlateCarree(),
+                facecolor="none",
+                edgecolor=INTERSTATE_COLOR,
+                linewidth=0.9,
+            ),
+            zorder=4,
+        )
