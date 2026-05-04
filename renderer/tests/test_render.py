@@ -30,11 +30,21 @@ def test_render_returns_png_bytes(decoded: DecodedScan) -> None:
     assert png.startswith(b"\x89PNG")
 
 
-def test_render_dimensions_match_options(decoded: DecodedScan) -> None:
-    opts = RenderOptions(width=400, height=400)
+def test_render_dimensions_match_options_no_footer(decoded: DecodedScan) -> None:
+    """Without the footer, the PNG matches (width, height) exactly."""
+    opts = RenderOptions(width=400, height=400, show_footer=False)
     png = render_base_reflectivity(decoded, opts)
     img = Image.open(io.BytesIO(png))
     assert img.size == (400, 400)
+
+
+def test_render_dimensions_grow_for_footer(decoded: DecodedScan) -> None:
+    """With the footer, the PNG height = requested height + 8% strip."""
+    opts = RenderOptions(width=400, height=400, show_footer=True)
+    png = render_base_reflectivity(decoded, opts)
+    img = Image.open(io.BytesIO(png))
+    assert img.size[0] == 400
+    assert img.size[1] == 400 + round(400 * 0.08)
 
 
 def test_render_respects_range_km(decoded: DecodedScan) -> None:
@@ -76,7 +86,7 @@ def test_render_title_includes_scan_time_and_data_age(decoded: DecodedScan) -> N
 
     Uses 30.0 to dodge banker's-rounding ambiguity on .5 values.
     """
-    fig, ax = _render_figure(decoded, RenderOptions(), data_age_seconds=30.0)
+    fig, ax = _render_figure(decoded, RenderOptions(show_footer=False), data_age_seconds=30.0)
     try:
         title = ax.get_title()
     finally:
@@ -94,7 +104,7 @@ def test_render_default_title_unchanged_when_no_age(decoded: DecodedScan) -> Non
     don't pin the exact text (locks us to a Py-ART version), but assert
     it's non-empty and lacks the "+Δ" annotation.
     """
-    fig, ax = _render_figure(decoded, RenderOptions(), data_age_seconds=None)
+    fig, ax = _render_figure(decoded, RenderOptions(show_footer=False), data_age_seconds=None)
     try:
         title = ax.get_title()
     finally:

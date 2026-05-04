@@ -90,3 +90,33 @@ def add_north_arrow(ax: Axes) -> None:
                         width=2, headwidth=8, headlength=8),
         zorder=10,
     )
+
+
+def add_footer(
+    footer_ax: Axes,
+    scan,  # DecodedScan
+    data_age_seconds: float | None,
+    renderer_version: str,
+) -> None:
+    """Render the metadata strip below the radar plot.
+
+    Single line, center-aligned. Format:
+      ``KATX • 0.5° base reflectivity • 2026-05-03 19:12 UTC • age 12s • dras-renderer v9.9.9``
+    """
+    footer_ax.set_facecolor("white")
+    footer_ax.set_xticks([])
+    footer_ax.set_yticks([])
+    for spine in footer_ax.spines.values():
+        spine.set_visible(False)
+
+    age_part = f"age {int(round(data_age_seconds))}s" if data_age_seconds is not None else "age unknown"
+    when = scan.scan_time.strftime("%Y-%m-%d %H:%M UTC")
+    text = (
+        f"{scan.station_id}  •  {scan.elevation_deg:.1f}° base reflectivity  "
+        f"•  {when}  •  {age_part}  •  dras-renderer v{renderer_version}"
+    )
+    footer_ax.text(
+        0.5, 0.5, text,
+        ha="center", va="center", fontsize=8, color="#333",
+        transform=footer_ax.transAxes,
+    )

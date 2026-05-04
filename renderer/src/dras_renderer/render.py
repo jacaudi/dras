@@ -132,10 +132,6 @@ def _render_figure(
     axes (title, artists) before the figure is closed. The caller owns the
     returned ``Figure`` and is responsible for calling ``plt.close(fig)``.
     """
-    fig = plt.figure(
-        figsize=(opts.width / opts.dpi, opts.height / opts.dpi),
-        dpi=opts.dpi,
-    )
     radar = scan.radar
     radar_lat = float(radar.latitude["data"][0])
     radar_lon = float(radar.longitude["data"][0])
@@ -147,7 +143,25 @@ def _render_figure(
         central_latitude=center_lat,
         central_longitude=center_lon,
     )
-    ax = fig.add_subplot(1, 1, 1, projection=projection)
+
+    footer_height_frac = 0.08 if opts.show_footer else 0.0
+    footer_px = round(opts.height * footer_height_frac)
+    total_height_px = opts.height + footer_px
+
+    fig = plt.figure(
+        figsize=(opts.width / opts.dpi, total_height_px / opts.dpi),
+        dpi=opts.dpi,
+    )
+
+    # Carve the figure into [radar plot on top, footer strip below].
+    radar_top_frac = opts.height / total_height_px
+    ax = fig.add_axes(
+        (0, 1 - radar_top_frac, 1, radar_top_frac),
+        projection=projection,
+    )
+    footer_ax = (
+        fig.add_axes((0, 0, 1, 1 - radar_top_frac)) if opts.show_footer else None
+    )
 
     # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
     # cos(lat) correction the east-west extent stretches by 33% at KATX
@@ -206,11 +220,13 @@ def _render_figure(
     # Override Py-ART's default title to surface both the volume start time
     # and the freshest-chunk age — answers "is this image stale?" at a glance.
     # MUST come after plot_ppi_map, which sets its own title via title_flag=True.
-    if data_age_seconds is not None:
+    if data_age_seconds is not None and not opts.show_footer:
         ax.set_title(
             f"{scan.station_id} {scan.elevation_deg:.1f} Deg. "
             f"{scan.scan_time.isoformat()}  +Δ {data_age_seconds:.0f}s"
         )
+    elif opts.show_footer:
+        ax.set_title("")  # suppress Py-ART's auto title
 
     if opts.show_cities:
         basemap.add_cities(
@@ -228,6 +244,12 @@ def _render_figure(
 
     if opts.show_north_arrow:
         furniture.add_north_arrow(ax)
+
+    if opts.show_footer and footer_ax is not None:
+        from dras_renderer.version import VERSION
+        furniture.add_footer(
+            footer_ax, scan, data_age_seconds, renderer_version=VERSION,
+        )
 
     return fig, ax
 

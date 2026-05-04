@@ -63,3 +63,22 @@ def test_add_north_arrow_adds_n_label() -> None:
         assert "N" in labels
     finally:
         plt.close(fig)
+
+
+def test_add_footer_text_includes_station_and_age(decoded) -> None:
+    """Footer text mentions station, scan time, and data-age annotation."""
+    from dras_renderer.furniture import add_footer
+
+    fig = plt.figure(figsize=(8, 8.6))
+    radar_ax = fig.add_axes((0, 0.08, 1, 0.92))
+    footer_ax = fig.add_axes((0, 0, 1, 0.08))
+
+    try:
+        add_footer(footer_ax, decoded, data_age_seconds=12.0,
+                   renderer_version="9.9.9")
+        labels = " ".join(t.get_text() for t in footer_ax.texts)
+        assert decoded.station_id in labels
+        assert "9.9.9" in labels
+        assert "12s" in labels
+    finally:
+        plt.close(fig)
