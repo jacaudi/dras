@@ -166,6 +166,9 @@ def _render_figure(
 
     basemap.add_land_water_fill(ax, extent)
 
+    if opts.show_counties:
+        basemap.add_counties(ax)
+
     # Basemap layers, drawn from bottom up.
     if opts.show_lakes:
         ax.add_feature(

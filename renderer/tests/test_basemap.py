@@ -37,3 +37,26 @@ def test_add_land_water_fill_adds_two_features() -> None:
         assert added >= 2  # one for ocean fill, one for land polygon
     finally:
         plt.close(fig)
+
+
+def test_add_counties_loads_records_once() -> None:
+    """County records are cached — repeated calls hit the lru_cache."""
+    from dras_renderer.basemap import _county_records, add_counties
+
+    _county_records.cache_clear()
+    add_counties(_make_axes()[1])
+    assert _county_records.cache_info().hits == 0
+    add_counties(_make_axes()[1])
+    assert _county_records.cache_info().hits >= 1
+
+
+def test_add_counties_adds_artist() -> None:
+    from dras_renderer.basemap import add_counties
+
+    fig, ax = _make_axes()
+    try:
+        baseline = len(ax._children)
+        add_counties(ax)
+        assert len(ax._children) > baseline
+    finally:
+        plt.close(fig)

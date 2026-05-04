@@ -8,8 +8,12 @@ unless documented otherwise. Loaders that read shapefiles wrap them in
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import cartopy.io.shapereader as shapereader
+from cartopy.feature import ShapelyFeature
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
 
@@ -54,3 +58,33 @@ def add_land_water_fill(
         edgecolor="none",
         zorder=1,
     )
+
+
+@lru_cache(maxsize=1)
+def _county_records() -> tuple:
+    """Load Natural Earth admin_2_counties_lakes (10m), cached.
+
+    Returns a tuple of shapely geometries. We strip attributes — we don't
+    need names, populations, or any other metadata to draw outlines.
+    """
+    path = shapereader.natural_earth(
+        category="cultural", name="admin_2_counties_lakes", resolution="10m"
+    )
+    return tuple(record.geometry for record in shapereader.Reader(path).records())
+
+
+def add_counties(ax: Axes) -> None:
+    """Draw US county boundaries as thin gray lines under states.
+
+    Counties shape comes from Natural Earth admin_2_counties_lakes (10m),
+    which excludes lake polygons (so we don't get spurious "county"
+    boundaries cutting through the Great Lakes / Lake Champlain).
+    """
+    feat = ShapelyFeature(
+        _county_records(),
+        ccrs.PlateCarree(),
+        facecolor="none",
+        edgecolor=COUNTY_COLOR,
+        linewidth=0.3,
+    )
+    ax.add_feature(feat, zorder=2)
