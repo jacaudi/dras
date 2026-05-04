@@ -37,3 +37,16 @@ def test_add_colorbar_creates_inset_axes() -> None:
         assert len(fig.axes) == before + 1
     finally:
         plt.close(fig)
+
+
+def test_add_scale_bar_adds_text_and_line() -> None:
+    """Scale bar adds at least one Line2D and one Text artist with '20 km'."""
+    from dras_renderer.furniture import add_scale_bar
+
+    fig, ax = _make_axes()
+    try:
+        add_scale_bar(ax, length_km=20)
+        labels = [t.get_text() for t in ax.texts]
+        assert any("20 km" in lab for lab in labels)
+    finally:
+        plt.close(fig)

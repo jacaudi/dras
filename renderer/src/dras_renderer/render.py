@@ -223,6 +223,9 @@ def _render_figure(
     if opts.show_colorbar:
         furniture.add_colorbar(ax, opts)
 
+    if opts.show_scale_bar:
+        furniture.add_scale_bar(ax)
+
     return fig, ax
 
 

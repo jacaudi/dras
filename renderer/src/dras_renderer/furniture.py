@@ -7,6 +7,9 @@ takes the radar axes (and any other context it needs) and mutates it.
 
 from __future__ import annotations
 
+import math
+
+import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
@@ -35,3 +38,36 @@ def add_colorbar(ax: Axes, opts) -> None:
     cb.set_ticks([-20, 0, 20, 40, 60, 75])
     cb.ax.tick_params(labelsize=6, length=2, pad=1)
     cb.set_label("dBZ", fontsize=6, labelpad=1)
+
+
+def add_scale_bar(ax: Axes, length_km: float = 20.0) -> None:
+    """Draw a fixed-length scale bar in the lower-right of the radar axes.
+
+    Length is converted from km to projected coords using the latitude
+    of the axes' center — accurate to within ~1% for any reasonable
+    radar zoom (the projection distortion over 20 km at mid-latitudes
+    is negligible).
+    """
+    west, east, south, north = ax.get_extent(crs=ccrs.PlateCarree())
+    center_lat = (south + north) / 2.0
+    # 1° lon ≈ 111 km · cos(lat); invert for "what fraction of a degree
+    # is `length_km`?".
+    deg_per_km = 1.0 / (111.0 * max(math.cos(math.radians(center_lat)), 1e-6))
+    bar_deg = length_km * deg_per_km
+
+    # Anchor at 5% in from the right edge, 5% up from the bottom.
+    x_end = east - 0.05 * (east - west)
+    x_start = x_end - bar_deg
+    y = south + 0.05 * (north - south)
+
+    ax.plot(
+        [x_start, x_end], [y, y],
+        color="black", linewidth=2,
+        transform=ccrs.PlateCarree(), zorder=10,
+    )
+    ax.text(
+        (x_start + x_end) / 2, y + 0.01 * (north - south),
+        f"{int(length_km)} km",
+        fontsize=7, color="black", ha="center", va="bottom",
+        transform=ccrs.PlateCarree(), zorder=10,
+    )
