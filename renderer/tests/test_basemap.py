@@ -85,3 +85,54 @@ def test_add_roads_adds_artist_when_extent_contains_roads() -> None:
         assert len(ax._children) > baseline
     finally:
         plt.close(fig)
+
+
+def test_add_cities_deconflict_runs(decoded) -> None:
+    """With deconflict=True, no two visible city label bboxes overlap.
+
+    Render at the KATX metro extent (Bremerton/Seattle/Tacoma cluster)
+    where the un-deconflicted labels visibly stack. Compare bbox pairs
+    in display coords.
+    """
+    import matplotlib.pyplot as plt
+    from dras_renderer.basemap import add_cities
+
+    fig, ax = _make_axes()
+    ax.set_extent((-122.7, -121.9, 47.2, 47.9), crs=ccrs.PlateCarree())
+    try:
+        add_cities(ax, extent=(-122.7, -121.9, 47.2, 47.9), max_scalerank=8,
+                   deconflict=True)
+        fig.canvas.draw()  # adjustText needs a canvas to compute bboxes
+
+        labels = [c for c in ax.texts if c.get_text()]
+        assert len(labels) >= 2
+        renderer = fig.canvas.get_renderer()
+        bboxes = [t.get_window_extent(renderer=renderer) for t in labels]
+        for i in range(len(bboxes)):
+            for j in range(i + 1, len(bboxes)):
+                # overlaps returns True if the bboxes touch or overlap.
+                assert not bboxes[i].overlaps(bboxes[j]), (
+                    f"labels {labels[i].get_text()!r} and "
+                    f"{labels[j].get_text()!r} overlap after deconfliction"
+                )
+    finally:
+        plt.close(fig)
+
+
+def test_add_cities_label_has_white_halo() -> None:
+    """Every city label has a white path_effects stroke for legibility."""
+    from matplotlib.patheffects import withStroke
+    from dras_renderer.basemap import add_cities
+
+    fig, ax = _make_axes()
+    try:
+        add_cities(ax, extent=(-123.0, -121.5, 47.0, 48.5), max_scalerank=8,
+                   deconflict=False)
+        for t in ax.texts:
+            effects = t.get_path_effects()
+            assert effects, f"label {t.get_text()!r} has no path effects"
+            kinds = {type(e).__name__ for e in effects}
+            assert "withStroke" in kinds or any(isinstance(e, withStroke)
+                                                for e in effects)
+    finally:
+        plt.close(fig)

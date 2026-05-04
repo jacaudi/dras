@@ -16,6 +16,7 @@ import cartopy.io.shapereader as shapereader
 from cartopy.feature import ShapelyFeature
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
+from matplotlib.patheffects import withStroke
 from shapely.geometry import box as _shapely_box
 
 # Color palette — single source of truth for the renderer's look.
@@ -191,34 +192,57 @@ def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
 
 
 def add_cities(
-    ax: Axes, extent: tuple[float, float, float, float], max_scalerank: int
+    ax: Axes,
+    extent: tuple[float, float, float, float],
+    max_scalerank: int,
+    *,
+    deconflict: bool = True,
 ) -> None:
-    """Plot Natural Earth populated places that lie inside the extent.
+    """Plot Natural Earth populated places inside ``extent``.
 
-    Filters by SCALERANK so dense metros don't drown the map in labels.
+    All labels get a white halo via ``path_effects.withStroke`` so they
+    stay legible when they fall over reflectivity colors.
+
+    When ``deconflict`` is True, ``adjustText.adjust_text`` repositions
+    overlapping labels iteratively. We catch and log any adjustText
+    failure (e.g., degenerate layouts) and fall back to halo-only
+    placement — the labels are still readable, just possibly overlapping.
     """
+    import logging
+    from adjustText import adjust_text
+
     west, east, south, north = extent
+    texts = []
     for lon0, lat0, name, scalerank in _populated_places_records():
         if scalerank > max_scalerank:
             continue
         if not (west <= lon0 <= east and south <= lat0 <= north):
             continue
         ax.plot(
-            lon0,
-            lat0,
-            "o",
-            markersize=2.5,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
+            lon0, lat0, "o",
+            markersize=2.5, color="black",
+            transform=ccrs.PlateCarree(), zorder=5,
         )
-        ax.text(
-            lon0 + 0.04,
-            lat0 + 0.02,
-            name,
-            fontsize=7,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
+        t = ax.text(
+            lon0 + 0.04, lat0 + 0.02, name,
+            fontsize=7, color="black",
+            transform=ccrs.PlateCarree(), zorder=6,
             clip_on=True,
+            path_effects=[withStroke(linewidth=2, foreground="white")],
         )
+        texts.append(t)
+
+    if deconflict and texts:
+        try:
+            adjust_text(
+                texts,
+                ax=ax,
+                expand_points=(1.2, 1.4),
+                arrowprops=None,  # no leader lines in v1
+                only_move={"text": "xy"},
+            )
+        except Exception:  # pragma: no cover - defensive
+            logging.getLogger(__name__).warning(
+                "adjustText failed; falling back to halo-only placement",
+                exc_info=True,
+            )

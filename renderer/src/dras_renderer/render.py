@@ -213,7 +213,12 @@ def _render_figure(
         )
 
     if opts.show_cities:
-        basemap.add_cities(ax, extent, opts.cities_max_scalerank)
+        basemap.add_cities(
+            ax,
+            extent,
+            opts.cities_max_scalerank,
+            deconflict=opts.deconflict_labels,
+        )
 
     return fig, ax
 
