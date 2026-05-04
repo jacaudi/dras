@@ -8,21 +8,20 @@ takes the radar axes (and any other context it needs) and mutates it.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-import cartopy.crs as ccrs
+import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from dras_renderer.decode import DecodedScan
     from dras_renderer.render import RenderOptions
 
 
-def add_colorbar(ax: Axes, opts: RenderOptions) -> None:
+def add_colorbar(ax: Any, opts: RenderOptions) -> None:
     """Inset horizontal reflectivity colorbar in the lower-left corner.
 
     Uses the same ``pyart_NWSRef`` cmap and (vmin, vmax) the radar plot
@@ -45,7 +44,7 @@ def add_colorbar(ax: Axes, opts: RenderOptions) -> None:
     cb.set_label("dBZ", fontsize=6, labelpad=1)
 
 
-def add_scale_bar(ax: Axes, length_km: float = 20.0) -> None:
+def add_scale_bar(ax: Any, length_km: float = 20.0) -> None:
     """Draw a fixed-length scale bar in the lower-right of the radar axes.
 
     Length is converted from km to projected coords using the latitude
@@ -78,7 +77,7 @@ def add_scale_bar(ax: Axes, length_km: float = 20.0) -> None:
     )
 
 
-def add_north_arrow(ax: Axes) -> None:
+def add_north_arrow(ax: Any) -> None:
     """Place a small N + upward arrow glyph in the upper-right of the axes.
 
     Uses axes-fraction coords so position is invariant to data extent.
@@ -98,7 +97,7 @@ def add_north_arrow(ax: Axes) -> None:
 
 
 def add_footer(
-    footer_ax: Axes,
+    footer_ax: Any,
     scan: DecodedScan,
     data_age_seconds: float | None,
     renderer_version: str,

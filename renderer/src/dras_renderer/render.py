@@ -155,8 +155,11 @@ def _render_figure(
     )
 
     # Carve the figure into [radar plot on top, footer strip below].
+    # ax is a Cartopy GeoAxes (since projection= is passed) — typed as Any
+    # because mpl stubs return plain Axes from add_axes, which lacks the
+    # GeoAxes-specific set_extent/add_feature methods we need below.
     radar_top_frac = opts.height / total_height_px
-    ax = fig.add_axes(
+    ax: Any = fig.add_axes(
         (0, 1 - radar_top_frac, 1, radar_top_frac),
         projection=projection,
     )

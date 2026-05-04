@@ -10,17 +10,17 @@ from __future__ import annotations
 
 import logging
 from functools import lru_cache
+from typing import Any
 
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-import cartopy.io.shapereader as shapereader
-from adjustText import adjust_text
+import cartopy.crs as ccrs  # type: ignore[import-untyped]
+import cartopy.feature as cfeature  # type: ignore[import-untyped]
+import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
+from adjustText import adjust_text  # type: ignore[import-untyped]
 from cartopy.feature import ShapelyFeature
-from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
 from matplotlib.patheffects import withStroke
-from shapely.geometry import box as _shapely_box
-from shapely.geometry.base import BaseGeometry
+from shapely.geometry import box as _shapely_box  # type: ignore[import-untyped]
+from shapely.geometry.base import BaseGeometry  # type: ignore[import-untyped]
 
 # Color palette — single source of truth for the renderer's look.
 LAND_COLOR = "#f5f0e6"      # warm cream
@@ -33,7 +33,7 @@ SECONDARY_ROAD_COLOR = "#888888"
 
 
 def add_land_water_fill(
-    ax: Axes, extent: tuple[float, float, float, float]
+    ax: Any, extent: tuple[float, float, float, float]
 ) -> None:
     """Paint the entire extent with WATER_COLOR, then overlay land polygons.
 
@@ -78,7 +78,7 @@ def _county_records() -> tuple[BaseGeometry, ...]:
     return tuple(record.geometry for record in shapereader.Reader(path).records())
 
 
-def add_counties(ax: Axes) -> None:
+def add_counties(ax: Any) -> None:
     """Draw US county boundaries as thin gray lines under states.
 
     Counties shape comes from Natural Earth admin_2_counties_lakes (10m),
@@ -120,7 +120,7 @@ def _road_records() -> tuple[tuple[BaseGeometry, str], ...]:
 
 
 def add_roads(
-    ax: Axes, extent: tuple[float, float, float, float]
+    ax: Any, extent: tuple[float, float, float, float]
 ) -> None:
     """Draw highways inside ``extent``: interstates dull-red, others gray.
 
@@ -131,8 +131,8 @@ def add_roads(
     west, east, south, north = extent
     bbox = _shapely_box(west, south, east, north)
 
-    interstates: list = []
-    secondaries: list = []
+    interstates: list[BaseGeometry] = []
+    secondaries: list[BaseGeometry] = []
     for geom, road_class in _road_records():
         if not geom.intersects(bbox):
             continue
@@ -195,7 +195,7 @@ def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
 
 
 def add_cities(
-    ax: Axes,
+    ax: Any,
     extent: tuple[float, float, float, float],
     max_scalerank: int,
     *,
