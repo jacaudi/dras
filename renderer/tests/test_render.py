@@ -117,3 +117,15 @@ def test_matplotlib_uses_agg_backend() -> None:
     import dras_renderer.render  # noqa: F401
 
     assert matplotlib.get_backend().lower() == "agg"
+
+
+def test_render_options_has_new_layer_toggles() -> None:
+    """All new visual layers default to on; can be flipped off independently."""
+    opts = RenderOptions()
+    assert opts.show_counties is True
+    assert opts.show_roads is True
+    assert opts.show_colorbar is True
+    assert opts.show_scale_bar is True
+    assert opts.show_north_arrow is True
+    assert opts.show_footer is True
+    assert opts.deconflict_labels is True

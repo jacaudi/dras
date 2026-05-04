@@ -79,6 +79,20 @@ class RenderOptions:
     # the Natural Earth maximum — every named populated place.
     cities_max_scalerank: int = 8
 
+    # New basemap layers (Task 4–7).
+    show_counties: bool = True
+    show_roads: bool = True
+
+    # Cartographic furniture (Task 9–12).
+    show_colorbar: bool = True
+    show_scale_bar: bool = True
+    show_north_arrow: bool = True
+    show_footer: bool = True
+
+    # Label deconfliction (Task 8). When False, falls back to the existing
+    # fixed-offset placement with a white text halo.
+    deconflict_labels: bool = True
+
 
 def render_base_reflectivity(
     scan: DecodedScan,
