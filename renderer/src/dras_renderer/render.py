@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import math
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
 # Headless backend MUST be selected before importing pyplot. ``matplotlib.use``
@@ -17,7 +16,6 @@ matplotlib.use("Agg")
 
 import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import cartopy.feature as cfeature  # type: ignore[import-untyped]
-import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt
 import pyart  # type: ignore[import-untyped]
 from matplotlib.axes import Axes
@@ -215,7 +213,7 @@ def _render_figure(
         )
 
     if opts.show_cities:
-        _add_cities(ax, extent, max_scalerank=opts.cities_max_scalerank)
+        basemap.add_cities(ax, extent, opts.cities_max_scalerank)
 
     return fig, ax
 
@@ -241,65 +239,3 @@ def _build_clutter_filter(radar: Any, opts: RenderOptions) -> Any:
         radar, "reflectivity", gatefilter=gf, size=opts.despeckle_size
     )
     return gf
-
-
-@lru_cache(maxsize=1)
-def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
-    """Load Natural Earth populated_places once.
-
-    Returns a tuple of (lon, lat, name, scalerank) tuples. Caching avoids
-    re-reading the shapefile on every render — the file is small but the
-    repeated I/O + shapely geometry construction is wasteful.
-    """
-    path = shapereader.natural_earth(
-        category="cultural", name="populated_places", resolution="10m"
-    )
-    out: list[tuple[float, float, str, int]] = []
-    for record in shapereader.Reader(path).records():
-        attrs = record.attributes
-        name = attrs.get("NAME") or attrs.get("name")
-        if not name:
-            continue
-        # SCALERANK is the Natural Earth "global importance" rank; lower
-        # = more prominent. 10 is the missing/sentinel value.
-        try:
-            scalerank = int(attrs.get("SCALERANK", 99))
-        except (TypeError, ValueError):
-            scalerank = 99
-        geom = record.geometry
-        out.append((float(geom.x), float(geom.y), str(name), scalerank))
-    return tuple(out)
-
-
-def _add_cities(
-    ax: Any, extent: tuple[float, float, float, float], max_scalerank: int
-) -> None:
-    """Plot Natural Earth populated places that lie inside the extent.
-
-    Filters by SCALERANK so dense metros don't drown the map in labels.
-    """
-    west, east, south, north = extent
-    for lon0, lat0, name, scalerank in _populated_places_records():
-        if scalerank > max_scalerank:
-            continue
-        if not (west <= lon0 <= east and south <= lat0 <= north):
-            continue
-        ax.plot(
-            lon0,
-            lat0,
-            "o",
-            markersize=2.5,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
-        )
-        ax.text(
-            lon0 + 0.04,
-            lat0 + 0.02,
-            name,
-            fontsize=7,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
-            clip_on=True,
-        )
