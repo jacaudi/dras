@@ -70,8 +70,8 @@ def build_app(config: Config | None = None) -> FastAPI:
         station: str,
         product: str = Query("base_reflectivity"),
         range_km: float = Query(230.0, ge=10.0, le=460.0),
-        width: int = Query(800, ge=200, le=4000),
-        height: int = Query(800, ge=200, le=4000),
+        width: int = Query(1000, ge=200, le=4000),
+        height: int = Query(1000, ge=200, le=4000),
         # Optional center override (decimal degrees, WGS84). When omitted
         # the view centers on the radar.
         center_lat: float | None = Query(None, ge=-90.0, le=90.0),
