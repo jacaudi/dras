@@ -50,3 +50,16 @@ def test_add_scale_bar_adds_text_and_line() -> None:
         assert any("20 km" in lab for lab in labels)
     finally:
         plt.close(fig)
+
+
+def test_add_north_arrow_adds_n_label() -> None:
+    """N arrow adds an 'N' text label."""
+    from dras_renderer.furniture import add_north_arrow
+
+    fig, ax = _make_axes()
+    try:
+        add_north_arrow(ax)
+        labels = [t.get_text() for t in ax.texts]
+        assert "N" in labels
+    finally:
+        plt.close(fig)

@@ -71,3 +71,22 @@ def add_scale_bar(ax: Axes, length_km: float = 20.0) -> None:
         fontsize=7, color="black", ha="center", va="bottom",
         transform=ccrs.PlateCarree(), zorder=10,
     )
+
+
+def add_north_arrow(ax: Axes) -> None:
+    """Place a small N + upward arrow glyph in the upper-right of the axes.
+
+    Uses axes-fraction coords so position is invariant to data extent.
+    """
+    ax.annotate(
+        "N",
+        xy=(0.95, 0.93),
+        xytext=(0.95, 0.97),
+        xycoords="axes fraction",
+        textcoords="axes fraction",
+        ha="center", va="bottom",
+        fontsize=10, fontweight="bold", color="black",
+        arrowprops=dict(facecolor="black", edgecolor="black",
+                        width=2, headwidth=8, headlength=8),
+        zorder=10,
+    )

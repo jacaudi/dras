@@ -226,6 +226,9 @@ def _render_figure(
     if opts.show_scale_bar:
         furniture.add_scale_bar(ax)
 
+    if opts.show_north_arrow:
+        furniture.add_north_arrow(ax)
+
     return fig, ax
 
 
