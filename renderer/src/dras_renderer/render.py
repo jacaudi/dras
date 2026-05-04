@@ -23,6 +23,7 @@ import pyart  # type: ignore[import-untyped]
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from dras_renderer import basemap
 from dras_renderer.decode import DecodedScan
 
 
@@ -162,6 +163,8 @@ def _render_figure(
         center_lat + delta_lat,
     )
     ax.set_extent(extent, crs=ccrs.PlateCarree())
+
+    basemap.add_land_water_fill(ax, extent)
 
     # Basemap layers, drawn from bottom up.
     if opts.show_lakes:
