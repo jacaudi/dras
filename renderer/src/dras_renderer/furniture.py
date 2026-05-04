@@ -8,6 +8,7 @@ takes the radar axes (and any other context it needs) and mutates it.
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -16,8 +17,12 @@ from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+if TYPE_CHECKING:
+    from dras_renderer.decode import DecodedScan
+    from dras_renderer.render import RenderOptions
 
-def add_colorbar(ax: Axes, opts) -> None:
+
+def add_colorbar(ax: Axes, opts: RenderOptions) -> None:
     """Inset horizontal reflectivity colorbar in the lower-left corner.
 
     Uses the same ``pyart_NWSRef`` cmap and (vmin, vmax) the radar plot
@@ -94,7 +99,7 @@ def add_north_arrow(ax: Axes) -> None:
 
 def add_footer(
     footer_ax: Axes,
-    scan,  # DecodedScan
+    scan: DecodedScan,
     data_age_seconds: float | None,
     renderer_version: str,
 ) -> None:

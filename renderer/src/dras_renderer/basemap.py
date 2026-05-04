@@ -8,16 +8,19 @@ unless documented otherwise. Loaders that read shapefiles wrap them in
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.io.shapereader as shapereader
+from adjustText import adjust_text
 from cartopy.feature import ShapelyFeature
 from matplotlib.axes import Axes
 from matplotlib.patches import Rectangle
 from matplotlib.patheffects import withStroke
 from shapely.geometry import box as _shapely_box
+from shapely.geometry.base import BaseGeometry
 
 # Color palette — single source of truth for the renderer's look.
 LAND_COLOR = "#f5f0e6"      # warm cream
@@ -63,7 +66,7 @@ def add_land_water_fill(
 
 
 @lru_cache(maxsize=1)
-def _county_records() -> tuple:
+def _county_records() -> tuple[BaseGeometry, ...]:
     """Load Natural Earth admin_2_counties_lakes (10m), cached.
 
     Returns a tuple of shapely geometries. We strip attributes — we don't
@@ -101,12 +104,12 @@ _INTERSTATE_CLASSES = frozenset({"Major Highway", "Beltway"})
 
 
 @lru_cache(maxsize=1)
-def _road_records() -> tuple:
+def _road_records() -> tuple[tuple[BaseGeometry, str], ...]:
     """Load Natural Earth roads (10m), cached. Returns ((geometry, class), ...)."""
     path = shapereader.natural_earth(
         category="cultural", name="roads", resolution="10m"
     )
-    out: list[tuple] = []
+    out: list[tuple[BaseGeometry, str]] = []
     for record in shapereader.Reader(path).records():
         attrs = record.attributes
         road_class = attrs.get("type") or attrs.get("TYPE") or ""
@@ -208,9 +211,6 @@ def add_cities(
     failure (e.g., degenerate layouts) and fall back to halo-only
     placement — the labels are still readable, just possibly overlapping.
     """
-    import logging
-    from adjustText import adjust_text
-
     west, east, south, north = extent
     texts = []
     for lon0, lat0, name, scalerank in _populated_places_records():

@@ -23,6 +23,7 @@ from matplotlib.figure import Figure
 
 from dras_renderer import basemap, furniture
 from dras_renderer.decode import DecodedScan
+from dras_renderer.version import VERSION
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class RenderOptions:
     center_lon: float | None = None
 
     # Clutter filter. Set ``clutter_filter=False`` to disable (renders the
-    # raw Py-ART ouput, useful for QA / debugging).
+    # raw Py-ART output, useful for QA / debugging).
     clutter_filter: bool = True
     # Reflectivity floor in dBZ. Anything weaker is suppressed — kills
     # noise floor + most ground/sea clutter and biota. 15 dBZ is a typical
@@ -246,7 +247,6 @@ def _render_figure(
         furniture.add_north_arrow(ax)
 
     if opts.show_footer and footer_ax is not None:
-        from dras_renderer.version import VERSION
         furniture.add_footer(
             footer_ax, scan, data_age_seconds, renderer_version=VERSION,
         )
