@@ -139,3 +139,14 @@ def test_render_options_has_new_layer_toggles() -> None:
     assert opts.show_north_arrow is True
     assert opts.show_footer is True
     assert opts.deconflict_labels is True
+
+
+def test_render_options_defaults_match_route_defaults() -> None:
+    """RenderOptions().width/.height must match the FastAPI route's
+    Query(...) defaults (1000×1000) so direct library use produces the
+    same dimensions as the HTTP API. Prior drift here gave library
+    callers an 800x864 PNG while the route produced 1000x1080.
+    """
+    opts = RenderOptions()
+    assert opts.width == 1000
+    assert opts.height == 1000

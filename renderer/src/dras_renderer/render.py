@@ -29,8 +29,8 @@ from dras_renderer.decode import DecodedScan
 class RenderOptions:
     """Options controlling render output."""
 
-    width: int = 800
-    height: int = 800
+    width: int = 1000
+    height: int = 1000
     # 150 km centers the view on the Puget Sound corridor (radar at Camano
     # Island for KATX) while keeping the inland Cascades and Olympia in
     # frame. The radar's nominal 230 km range zooms out so far that named
