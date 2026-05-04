@@ -31,9 +31,9 @@ def test_add_land_water_fill_adds_two_features() -> None:
     """add_land_water_fill paints ocean then masks with land — two features."""
     fig, ax = _make_axes()
     try:
-        baseline_features = len(ax._children)
+        baseline_features = len(ax.get_children())
         add_land_water_fill(ax, extent=(-123.0, -121.5, 47.0, 48.5))
-        added = len(ax._children) - baseline_features
+        added = len(ax.get_children()) - baseline_features
         assert added >= 2  # one for ocean fill, one for land polygon
     finally:
         plt.close(fig)
@@ -55,9 +55,9 @@ def test_add_counties_adds_artist() -> None:
 
     fig, ax = _make_axes()
     try:
-        baseline = len(ax._children)
+        baseline = len(ax.get_children())
         add_counties(ax)
-        assert len(ax._children) > baseline
+        assert len(ax.get_children()) > baseline
     finally:
         plt.close(fig)
 
@@ -80,9 +80,9 @@ def test_add_roads_adds_artist_when_extent_contains_roads() -> None:
 
     fig, ax = _make_axes()
     try:
-        baseline = len(ax._children)
+        baseline = len(ax.get_children())
         add_roads(ax, extent=(-123.0, -121.5, 47.0, 48.5))  # KATX metro
-        assert len(ax._children) > baseline
+        assert len(ax.get_children()) > baseline
     finally:
         plt.close(fig)
 
