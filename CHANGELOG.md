@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.11.0](https://github.com/jacaudi/dras/compare/v2.10.1...v2.11.0) (2026-05-05)
+
+### Features
+
+* **renderer:** visual upgrade — basemap, deconflicted labels, furniture, footer ([#119](https://github.com/jacaudi/dras/issues/119)) ([5a41bed](https://github.com/jacaudi/dras/commit/5a41bed1ef833ac284d6ed8bdb48b87d2aa1ec2e))
+
 ## [2.10.1](https://github.com/jacaudi/dras/compare/v2.10.0...v2.10.1) (2026-05-03)
 
 ### Bug Fixes
