@@ -54,6 +54,34 @@ func TestGetMode(t *testing.T) {
 	}
 }
 
+func TestGetVCPInfo(t *testing.T) {
+	t.Run("known", func(t *testing.T) {
+		info, err := GetVCPInfo("R212")
+		if err != nil {
+			t.Fatalf("unexpected error for R212: %v", err)
+		}
+		if info.Mode != "Precipitation" {
+			t.Errorf("Mode = %q, want %q", info.Mode, "Precipitation")
+		}
+		if !strings.Contains(info.Description, "SAILS") {
+			t.Errorf("Description = %q, expected to mention SAILS", info.Description)
+		}
+	})
+
+	t.Run("unknown", func(t *testing.T) {
+		info, err := GetVCPInfo("R999")
+		if !errors.Is(err, ErrUnknownVCP) {
+			t.Fatalf("expected ErrUnknownVCP, got %v", err)
+		}
+		if !strings.Contains(info.Mode, "Unknown") {
+			t.Errorf("Mode = %q, expected to contain \"Unknown\"", info.Mode)
+		}
+		if !strings.Contains(info.Description, "R999") {
+			t.Errorf("Description = %q, expected to contain raw VCP %q", info.Description, "R999")
+		}
+	})
+}
+
 func TestSanitizeStationIDs(t *testing.T) {
 	tests := []struct {
 		input    string

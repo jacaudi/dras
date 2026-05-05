@@ -10,11 +10,29 @@ import (
 	"github.com/jacaudi/nws/cmd/nws"
 )
 
-// ErrUnknownVCP is returned by GetMode when the VCP code is empty or not
-// recognized. Callers can use errors.Is to detect this case and treat it as
-// a soft condition (use the returned fallback label, log a warning, continue)
-// rather than aborting station processing.
+// ErrUnknownVCP is returned by GetMode/GetVCPInfo when the VCP code is empty
+// or not recognized. Callers can use errors.Is to detect this case and treat
+// it as a soft condition (use the returned fallback label, log a warning,
+// continue) rather than aborting station processing.
 var ErrUnknownVCP = errors.New("unknown VCP")
+
+// VCPInfo describes a NEXRAD WSR-88D Volume Coverage Pattern.
+type VCPInfo struct {
+	Mode        string // Coarse category: "Clear Air" or "Precipitation"
+	Description string // Human-readable detail about the scan pattern
+}
+
+// vcpCatalog maps VCP codes (as reported by the NWS radar metadata API) to
+// their coarse mode and a short description. Source: NOAA/NWS WSR-88D
+// operations documentation.
+var vcpCatalog = map[string]VCPInfo{
+	"R31":  {Mode: "Clear Air", Description: "Clear Air, long pulse (~10 min cycle, stratiform/biological targets)"},
+	"R35":  {Mode: "Clear Air", Description: "Clear Air, short pulse with clutter mitigation (~7 min cycle)"},
+	"R12":  {Mode: "Precipitation", Description: "Precipitation, rapid evolution (~4.2 min cycle, 14 elevations)"},
+	"R112": {Mode: "Precipitation", Description: "Precipitation with MRLE (multi-PRF range-folding mitigation)"},
+	"R212": {Mode: "Precipitation", Description: "Precipitation with SAILS (~4.5 min cycle, common severe-weather VCP)"},
+	"R215": {Mode: "Precipitation", Description: "Precipitation (~6 min cycle, 15 elevations, tropical/widespread)"},
+}
 
 // Data represents the data for a radar.
 type Data struct {
@@ -79,35 +97,33 @@ func (s *Service) FetchData(stationID string) (*Data, error) {
 	return radarData, nil
 }
 
-// GetMode returns the radar mode based on the given VCP (Volume Coverage Pattern) code.
-// It maps specific VCP codes to corresponding radar modes.
+// GetMode returns the radar mode for a given VCP code, looked up from
+// vcpCatalog.
 //
-// If the VCP code is empty or not recognized, GetMode returns a fallback label
-// of the form `Unknown (VCP %q)` along with an error wrapping ErrUnknownVCP.
-// Callers should treat this as a soft condition: errors.Is(err, ErrUnknownVCP)
-// → use the fallback label and continue.
+// If the VCP code is empty or not in the catalog, GetMode returns a fallback
+// label of the form `Unknown (VCP %q)` along with an error wrapping
+// ErrUnknownVCP. Callers should treat this as a soft condition:
+// errors.Is(err, ErrUnknownVCP) → use the fallback label and continue.
 func GetMode(vcp string) (string, error) {
-	var radarMode string
-
-	switch vcp {
-	case "R31":
-		radarMode = "Clear Air"
-	case "R35":
-		radarMode = "Clear Air"
-	case "R12":
-		radarMode = "Precipitation"
-	case "R112":
-		radarMode = "Precipitation"
-	case "R212":
-		radarMode = "Precipitation"
-	case "R215":
-		radarMode = "Precipitation"
-	default:
-		fallback := fmt.Sprintf("Unknown (VCP %q)", vcp)
-		return fallback, fmt.Errorf("%w: %q", ErrUnknownVCP, vcp)
+	if info, ok := vcpCatalog[vcp]; ok {
+		return info.Mode, nil
 	}
+	fallback := fmt.Sprintf("Unknown (VCP %q)", vcp)
+	return fallback, fmt.Errorf("%w: %q", ErrUnknownVCP, vcp)
+}
 
-	return radarMode, nil
+// GetVCPInfo returns the full catalog entry (mode + description) for a VCP
+// code. Unknown VCPs return a fallback VCPInfo and an error wrapping
+// ErrUnknownVCP, with the same soft-handle semantics as GetMode.
+func GetVCPInfo(vcp string) (VCPInfo, error) {
+	if info, ok := vcpCatalog[vcp]; ok {
+		return info, nil
+	}
+	fallback := VCPInfo{
+		Mode:        fmt.Sprintf("Unknown (VCP %q)", vcp),
+		Description: fmt.Sprintf("Unrecognized VCP code %q", vcp),
+	}
+	return fallback, fmt.Errorf("%w: %q", ErrUnknownVCP, vcp)
 }
 
 // simplifyGeneratorState generates the simplified generator state based on the given input.
