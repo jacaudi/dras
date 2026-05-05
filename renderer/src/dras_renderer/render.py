@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import math
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Any
 
 # Headless backend MUST be selected before importing pyplot. ``matplotlib.use``
@@ -17,21 +16,22 @@ matplotlib.use("Agg")
 
 import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import cartopy.feature as cfeature  # type: ignore[import-untyped]
-import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
 import matplotlib.pyplot as plt
 import pyart  # type: ignore[import-untyped]
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from dras_renderer import basemap, furniture
 from dras_renderer.decode import DecodedScan
+from dras_renderer.version import VERSION
 
 
 @dataclass(frozen=True)
 class RenderOptions:
     """Options controlling render output."""
 
-    width: int = 800
-    height: int = 800
+    width: int = 1000
+    height: int = 1000
     # 150 km centers the view on the Puget Sound corridor (radar at Camano
     # Island for KATX) while keeping the inland Cascades and Olympia in
     # frame. The radar's nominal 230 km range zooms out so far that named
@@ -50,7 +50,7 @@ class RenderOptions:
     center_lon: float | None = None
 
     # Clutter filter. Set ``clutter_filter=False`` to disable (renders the
-    # raw Py-ART ouput, useful for QA / debugging).
+    # raw Py-ART output, useful for QA / debugging).
     clutter_filter: bool = True
     # Reflectivity floor in dBZ. Anything weaker is suppressed — kills
     # noise floor + most ground/sea clutter and biota. 15 dBZ is a typical
@@ -78,6 +78,20 @@ class RenderOptions:
     # (Renton, Bremerton, Everett, Bellingham, Olympia, Aberdeen). 10 is
     # the Natural Earth maximum — every named populated place.
     cities_max_scalerank: int = 8
+
+    # New basemap layers (Task 4–7).
+    show_counties: bool = True
+    show_roads: bool = True
+
+    # Cartographic furniture (Task 9–12).
+    show_colorbar: bool = True
+    show_scale_bar: bool = True
+    show_north_arrow: bool = True
+    show_footer: bool = True
+
+    # Label deconfliction (Task 8). When False, falls back to the existing
+    # fixed-offset placement with a white text halo.
+    deconflict_labels: bool = True
 
 
 def render_base_reflectivity(
@@ -119,10 +133,6 @@ def _render_figure(
     axes (title, artists) before the figure is closed. The caller owns the
     returned ``Figure`` and is responsible for calling ``plt.close(fig)``.
     """
-    fig = plt.figure(
-        figsize=(opts.width / opts.dpi, opts.height / opts.dpi),
-        dpi=opts.dpi,
-    )
     radar = scan.radar
     radar_lat = float(radar.latitude["data"][0])
     radar_lon = float(radar.longitude["data"][0])
@@ -134,7 +144,28 @@ def _render_figure(
         central_latitude=center_lat,
         central_longitude=center_lon,
     )
-    ax = fig.add_subplot(1, 1, 1, projection=projection)
+
+    footer_height_frac = 0.08 if opts.show_footer else 0.0
+    footer_px = round(opts.height * footer_height_frac)
+    total_height_px = opts.height + footer_px
+
+    fig = plt.figure(
+        figsize=(opts.width / opts.dpi, total_height_px / opts.dpi),
+        dpi=opts.dpi,
+    )
+
+    # Carve the figure into [radar plot on top, footer strip below].
+    # ax is a Cartopy GeoAxes (since projection= is passed) — typed as Any
+    # because mpl stubs return plain Axes from add_axes, which lacks the
+    # GeoAxes-specific set_extent/add_feature methods we need below.
+    radar_top_frac = opts.height / total_height_px
+    ax: Any = fig.add_axes(
+        (0, 1 - radar_top_frac, 1, radar_top_frac),
+        projection=projection,
+    )
+    footer_ax = (
+        fig.add_axes((0, 0, 1, 1 - radar_top_frac)) if opts.show_footer else None
+    )
 
     # 1° lat ≈ 111 km everywhere; 1° lon ≈ 111 cos(lat) km. Without the
     # cos(lat) correction the east-west extent stretches by 33% at KATX
@@ -149,7 +180,19 @@ def _render_figure(
     )
     ax.set_extent(extent, crs=ccrs.PlateCarree())
 
-    # Basemap layers, drawn from bottom up.
+    basemap.add_land_water_fill(ax, extent)
+
+    if opts.show_counties:
+        basemap.add_counties(ax)
+
+    # Remaining basemap layers, in the design z-order:
+    # states → roads → coastline → lakes (outlined) → borders.
+    # Lakes come after coastline so their outline isn't cut by the
+    # coastline stroke where they touch the shore.
+    ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
+    if opts.show_roads:
+        basemap.add_roads(ax, extent)
+    ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
     if opts.show_lakes:
         ax.add_feature(
             cfeature.LAKES.with_scale("50m"),
@@ -157,8 +200,6 @@ def _render_figure(
             edgecolor="#4a6da7",
             linewidth=0.4,
         )
-    ax.add_feature(cfeature.STATES.with_scale("50m"), edgecolor="gray", linewidth=0.5)
-    ax.add_feature(cfeature.COASTLINE.with_scale("50m"), edgecolor="black", linewidth=0.5)
     if opts.show_borders:
         ax.add_feature(
             cfeature.BORDERS.with_scale("50m"),
@@ -186,14 +227,35 @@ def _render_figure(
     # Override Py-ART's default title to surface both the volume start time
     # and the freshest-chunk age — answers "is this image stale?" at a glance.
     # MUST come after plot_ppi_map, which sets its own title via title_flag=True.
-    if data_age_seconds is not None:
+    if data_age_seconds is not None and not opts.show_footer:
         ax.set_title(
             f"{scan.station_id} {scan.elevation_deg:.1f} Deg. "
             f"{scan.scan_time.isoformat()}  +Δ {data_age_seconds:.0f}s"
         )
+    elif opts.show_footer:
+        ax.set_title("")  # suppress Py-ART's auto title
 
     if opts.show_cities:
-        _add_cities(ax, extent, max_scalerank=opts.cities_max_scalerank)
+        basemap.add_cities(
+            ax,
+            extent,
+            opts.cities_max_scalerank,
+            deconflict=opts.deconflict_labels,
+        )
+
+    if opts.show_colorbar:
+        furniture.add_colorbar(ax, opts)
+
+    if opts.show_scale_bar:
+        furniture.add_scale_bar(ax)
+
+    if opts.show_north_arrow:
+        furniture.add_north_arrow(ax)
+
+    if opts.show_footer and footer_ax is not None:
+        furniture.add_footer(
+            footer_ax, scan, data_age_seconds, renderer_version=VERSION,
+        )
 
     return fig, ax
 
@@ -219,65 +281,3 @@ def _build_clutter_filter(radar: Any, opts: RenderOptions) -> Any:
         radar, "reflectivity", gatefilter=gf, size=opts.despeckle_size
     )
     return gf
-
-
-@lru_cache(maxsize=1)
-def _populated_places_records() -> tuple[tuple[float, float, str, int], ...]:
-    """Load Natural Earth populated_places once.
-
-    Returns a tuple of (lon, lat, name, scalerank) tuples. Caching avoids
-    re-reading the shapefile on every render — the file is small but the
-    repeated I/O + shapely geometry construction is wasteful.
-    """
-    path = shapereader.natural_earth(
-        category="cultural", name="populated_places", resolution="10m"
-    )
-    out: list[tuple[float, float, str, int]] = []
-    for record in shapereader.Reader(path).records():
-        attrs = record.attributes
-        name = attrs.get("NAME") or attrs.get("name")
-        if not name:
-            continue
-        # SCALERANK is the Natural Earth "global importance" rank; lower
-        # = more prominent. 10 is the missing/sentinel value.
-        try:
-            scalerank = int(attrs.get("SCALERANK", 99))
-        except (TypeError, ValueError):
-            scalerank = 99
-        geom = record.geometry
-        out.append((float(geom.x), float(geom.y), str(name), scalerank))
-    return tuple(out)
-
-
-def _add_cities(
-    ax: Any, extent: tuple[float, float, float, float], max_scalerank: int
-) -> None:
-    """Plot Natural Earth populated places that lie inside the extent.
-
-    Filters by SCALERANK so dense metros don't drown the map in labels.
-    """
-    west, east, south, north = extent
-    for lon0, lat0, name, scalerank in _populated_places_records():
-        if scalerank > max_scalerank:
-            continue
-        if not (west <= lon0 <= east and south <= lat0 <= north):
-            continue
-        ax.plot(
-            lon0,
-            lat0,
-            "o",
-            markersize=2.5,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
-        )
-        ax.text(
-            lon0 + 0.04,
-            lat0 + 0.02,
-            name,
-            fontsize=7,
-            color="black",
-            transform=ccrs.PlateCarree(),
-            zorder=5,
-            clip_on=True,
-        )

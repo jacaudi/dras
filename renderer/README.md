@@ -31,8 +31,8 @@ Query parameters (all optional):
 |---|---|---|---|
 | `product` | `base_reflectivity` | — | Only value supported in v1. |
 | `range_km` | `230` | `[10, 460]` | Render extent radius. 460 is the Level II max unambiguous range. |
-| `width` | `800` | `[200, 4000]` | Output PNG width. |
-| `height` | `800` | `[200, 4000]` | Output PNG height. |
+| `width` | `1000` | `[200, 4000]` | Output PNG width. |
+| `height` | `1000` | `[200, 4000]` | Radar plot height; total PNG height adds an ~8% footer strip. |
 
 Error responses use a stable envelope:
 
@@ -54,6 +54,43 @@ Error responses use a stable envelope:
 - `renderer_requests_total{outcome=...}` — request counter labeled `ok` or `error_<code>`.
 - `renderer_render_duration_seconds` — end-to-end render histogram (100ms–60s buckets).
 - `renderer_s3_errors_total` — S3 list/download failure counter.
+
+## View presets
+
+The `?view=<name>` query parameter applies an opinionated framing for a
+station (recenter + zoom). Presets are opt-in — without `?view=`, the
+renderer centers on the radar with the default `range_km`.
+
+Currently defined:
+
+| Station | View    | Center               | Range  |
+|---------|---------|----------------------|--------|
+| KATX    | `metro` | 47.61°N, -122.33°E   | 70 km  |
+
+Example:
+
+```
+GET /render/KATX?view=metro
+```
+
+### Adding a view preset
+
+View presets live in `src/dras_renderer/station_views.py`. To add a new
+framing for a station:
+
+1. Append an entry to `_VIEWS` keyed on `(station_id, view_name)`.
+2. Set `center_lat`, `center_lon`, and `range_km` to your desired framing.
+3. Add a row to the table above.
+
+Example — adding a Bay Area view for KMUX:
+
+```python
+("KMUX", "metro"): StationView(
+    center_lat=37.77,
+    center_lon=-122.42,
+    range_km=70.0,
+),
+```
 
 ## Local development
 

@@ -187,3 +187,21 @@ def test_render_route_lowercases_station(fixture_bytes: bytes) -> None:
 
     assert resp.status_code == 200
     assert captured["station"] == "KATX"
+
+
+def test_render_default_dimensions_are_1000(fixture_bytes: bytes) -> None:
+    """Default render returns a 1000-px-wide image (height grows with footer)."""
+    import io
+
+    from PIL import Image
+
+    with patch("dras_renderer.s3.S3Client.latest_volume", return_value=_vol()), \
+         patch("dras_renderer.s3.S3Client.download_volume", return_value=fixture_bytes):
+        client = TestClient(build_app())
+        resp = client.get("/render/KATX")
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    img = Image.open(io.BytesIO(base64.b64decode(payload["image"])))
+    assert img.size[0] == 1000  # width
+    assert img.size[1] >= 1000  # height (>= 1000; footer adds extra later)
