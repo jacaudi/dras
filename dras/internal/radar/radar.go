@@ -20,18 +20,20 @@ var ErrUnknownVCP = errors.New("unknown VCP")
 type VCPInfo struct {
 	Mode        string // Coarse category: "Clear Air" or "Precipitation"
 	Description string // Human-readable detail about the scan pattern
+	AlertText   string // User-facing message used in change notifications
 }
 
 // vcpCatalog maps VCP codes (as reported by the NWS radar metadata API) to
-// their coarse mode and a short description. Source: NOAA/NWS WSR-88D
-// operations documentation.
+// their coarse mode, a short description, and the alert text shown to users
+// when this VCP becomes active. Source: NOAA/NWS WSR-88D operations
+// documentation.
 var vcpCatalog = map[string]VCPInfo{
-	"R31":  {Mode: "Clear Air", Description: "Clear Air, long pulse (~10 min cycle, stratiform/biological targets)"},
-	"R35":  {Mode: "Clear Air", Description: "Clear Air, short pulse with clutter mitigation (~7 min cycle)"},
-	"R12":  {Mode: "Precipitation", Description: "Precipitation, rapid evolution (~4.2 min cycle, 14 elevations)"},
-	"R112": {Mode: "Precipitation", Description: "Precipitation with MRLE (multi-PRF range-folding mitigation)"},
-	"R212": {Mode: "Precipitation", Description: "Precipitation with SAILS (~4.5 min cycle, common severe-weather VCP)"},
-	"R215": {Mode: "Precipitation", Description: "Precipitation (~6 min cycle, 15 elevations, tropical/widespread)"},
+	"R31":  {Mode: "Clear Air", Description: "Clear Air, long pulse (~10 min cycle, stratiform/biological targets)", AlertText: "Clear Air Mode Active"},
+	"R35":  {Mode: "Clear Air", Description: "Clear Air, short pulse with clutter mitigation (~7 min cycle)", AlertText: "Clear Air Mode Active"},
+	"R12":  {Mode: "Precipitation", Description: "Precipitation, rapid evolution (~4.2 min cycle, 14 elevations)", AlertText: "Precipitation Mode Active"},
+	"R112": {Mode: "Precipitation", Description: "Precipitation with MRLE (multi-PRF range-folding mitigation)", AlertText: "Precipitation Mode (Velocity Scanning Emphasis) Active"},
+	"R212": {Mode: "Precipitation", Description: "Precipitation with SAILS (~4.5 min cycle, common severe-weather VCP)", AlertText: "Precipitation Mode Active"},
+	"R215": {Mode: "Precipitation", Description: "Precipitation (~6 min cycle, 15 elevations, tropical/widespread)", AlertText: "Precipitation Mode (Vertical Scanning Emphasis) Active"},
 }
 
 // Data represents the data for a radar.
