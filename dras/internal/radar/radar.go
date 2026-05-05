@@ -3,11 +3,18 @@ package radar
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/jacaudi/nws/cmd/nws"
 )
+
+// ErrUnknownVCP is returned by GetMode when the VCP code is empty or not
+// recognized. Callers can use errors.Is to detect this case and treat it as
+// a soft condition (use the returned fallback label, log a warning, continue)
+// rather than aborting station processing.
+var ErrUnknownVCP = errors.New("unknown VCP")
 
 // Data represents the data for a radar.
 type Data struct {
@@ -38,11 +45,17 @@ func (s *Service) FetchData(stationID string) (*Data, error) {
 		return nil, fmt.Errorf("failed to get RADAR data for station %q: %w", stationID, err)
 	}
 
-	// Fetching radar VCP and determine mode
+	// Fetching radar VCP and determine mode. An empty or unrecognized VCP is
+	// not fatal: GetMode returns a "Unknown (VCP ...)" fallback label along
+	// with ErrUnknownVCP. We log a warning and continue so the rest of the
+	// station data (status, generator state, etc.) still gets processed.
 	radarVCPCode := radarResponse.RDA.Properties.VolumeCoveragePattern
-	radarMode, err := GetMode(radarVCPCode) // Converting VCP to readable mode
+	radarMode, err := GetMode(radarVCPCode)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, ErrUnknownVCP) {
+			return nil, err
+		}
+		slog.Warn("Unrecognized VCP, using fallback mode label", "station", stationID, "vcp", radarVCPCode, "mode", radarMode)
 	}
 
 	// Fetching radar VCP and determine mode
@@ -68,7 +81,11 @@ func (s *Service) FetchData(stationID string) (*Data, error) {
 
 // GetMode returns the radar mode based on the given VCP (Volume Coverage Pattern) code.
 // It maps specific VCP codes to corresponding radar modes.
-// If the VCP code is not recognized, it returns an error.
+//
+// If the VCP code is empty or not recognized, GetMode returns a fallback label
+// of the form `Unknown (VCP %q)` along with an error wrapping ErrUnknownVCP.
+// Callers should treat this as a soft condition: errors.Is(err, ErrUnknownVCP)
+// → use the fallback label and continue.
 func GetMode(vcp string) (string, error) {
 	var radarMode string
 
@@ -86,7 +103,8 @@ func GetMode(vcp string) (string, error) {
 	case "R215":
 		radarMode = "Precipitation"
 	default:
-		return "", fmt.Errorf("unknown mode for VCP %s -- please update code", vcp)
+		fallback := fmt.Sprintf("Unknown (VCP %q)", vcp)
+		return fallback, fmt.Errorf("%w: %q", ErrUnknownVCP, vcp)
 	}
 
 	return radarMode, nil

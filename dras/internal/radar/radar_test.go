@@ -1,31 +1,43 @@
 package radar
 
 import (
+	"errors"
+	"strings"
 	"testing"
 )
 
 func TestGetMode(t *testing.T) {
 	tests := []struct {
-		vcp      string
-		expected string
-		hasError bool
+		name           string
+		vcp            string
+		expectedMode   string
+		expectUnknown  bool
+		fallbackSubstr string
 	}{
-		{"R31", "Clear Air", false},
-		{"R35", "Clear Air", false},
-		{"R12", "Precipitation", false},
-		{"R112", "Precipitation", false},
-		{"R212", "Precipitation", false},
-		{"R215", "Precipitation", false},
-		{"R99", "", true}, // Unknown VCP should return error
+		{name: "R31", vcp: "R31", expectedMode: "Clear Air"},
+		{name: "R35", vcp: "R35", expectedMode: "Clear Air"},
+		{name: "R12", vcp: "R12", expectedMode: "Precipitation"},
+		{name: "R112", vcp: "R112", expectedMode: "Precipitation"},
+		{name: "R212", vcp: "R212", expectedMode: "Precipitation"},
+		{name: "R215", vcp: "R215", expectedMode: "Precipitation"},
+		{name: "unknown_R99", vcp: "R99", expectUnknown: true, fallbackSubstr: `"R99"`},
+		{name: "empty", vcp: "", expectUnknown: true, fallbackSubstr: `""`},
+		{name: "whitespace", vcp: " ", expectUnknown: true, fallbackSubstr: `" "`},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.vcp, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			mode, err := GetMode(tt.vcp)
 
-			if tt.hasError {
-				if err == nil {
-					t.Errorf("Expected error for VCP %s, but got none", tt.vcp)
+			if tt.expectUnknown {
+				if !errors.Is(err, ErrUnknownVCP) {
+					t.Fatalf("expected ErrUnknownVCP for VCP %q, got %v", tt.vcp, err)
+				}
+				if !strings.Contains(mode, "Unknown") {
+					t.Errorf("expected fallback mode label to contain \"Unknown\" for VCP %q, got %q", tt.vcp, mode)
+				}
+				if !strings.Contains(mode, tt.fallbackSubstr) {
+					t.Errorf("expected fallback mode label to contain %s for VCP %q, got %q", tt.fallbackSubstr, tt.vcp, mode)
 				}
 				return
 			}
@@ -35,8 +47,8 @@ func TestGetMode(t *testing.T) {
 				return
 			}
 
-			if mode != tt.expected {
-				t.Errorf("For VCP %s, expected mode %q, got %q", tt.vcp, tt.expected, mode)
+			if mode != tt.expectedMode {
+				t.Errorf("For VCP %s, expected mode %q, got %q", tt.vcp, tt.expectedMode, mode)
 			}
 		})
 	}
