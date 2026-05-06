@@ -100,11 +100,6 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 		return fmt.Errorf("error fetching radar data for station %s: %w", stationID, err)
 	}
 
-	mode, err := radar.GetMode(newRadarData.VCP)
-	if err != nil {
-		return fmt.Errorf("error determining radar mode for station %s: %w", stationID, err)
-	}
-
 	// Poll and store the latest radar image so it can be attached to the
 	// next change notification. Image fetch failures are logged but do not
 	// fail the whole poll.
@@ -124,7 +119,7 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 
 	// Handle first run outside of mutex
 	if isFirstRun {
-		initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, mode)
+		initialMessage := fmt.Sprintf("%s %s - %s Mode", stationID, newRadarData.Name, newRadarData.Mode)
 		stationLogger.Info(fmt.Sprintf("Initial radar data stored - %s", initialMessage))
 		if m.config.DryRun {
 			stationLogger.Debug(fmt.Sprintf("Would send startup notification: %s", initialMessage))
