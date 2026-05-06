@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.12.0](https://github.com/jacaudi/dras/compare/v2.11.0...v2.12.0) (2026-05-06)
+
+### Bug Fixes
+
+* **radar:** handle empty/unknown VCP without aborting station processing ([c623fe0](https://github.com/jacaudi/dras/commit/c623fe0d20ce2fc25558654b040aff030501c668)), closes [#121](https://github.com/jacaudi/dras/issues/121)
+
 ## [2.11.0](https://github.com/jacaudi/dras/compare/v2.10.1...v2.11.0) (2026-05-05)
 
 ### Features
