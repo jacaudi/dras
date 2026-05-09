@@ -26,22 +26,44 @@ def add_colorbar(ax: Any, opts: RenderOptions) -> None:
 
     Uses the same ``pyart_NWSRef`` cmap and (vmin, vmax) the radar plot
     is rendered with so the inset is exactly the active scale.
+
+    Sized for legibility: thicker bar, integer ticks every 10 dBZ, a
+    thin black border, and an explicit "dBZ" unit label.
     """
     cax = inset_axes(
         ax,
-        width="28%", height="3%",
+        width="34%", height="4.5%",
         loc="lower left",
-        bbox_to_anchor=(0.02, 0.02, 1, 1),
+        bbox_to_anchor=(0.02, 0.025, 1, 1),
         bbox_transform=ax.transAxes,
         borderpad=0,
     )
-    cax.set_facecolor((1, 1, 1, 0.85))
+    cax.set_facecolor((1, 1, 1, 0.9))
     sm = ScalarMappable(norm=Normalize(vmin=opts.vmin, vmax=opts.vmax),
                         cmap="pyart_NWSRef")
     cb = plt.colorbar(sm, cax=cax, orientation="horizontal")
-    cb.set_ticks([-20, 0, 20, 40, 60, 75])
-    cb.ax.tick_params(labelsize=6, length=2, pad=1)
-    cb.set_label("dBZ", fontsize=6, labelpad=1)
+    # Ticks every 20 dBZ — 11 ticks at 10-dBZ spacing crowd into the
+    # 340 px bar and the appended upper bound (e.g. 75) glues onto the
+    # last decade tick (70). Even spacing reads cleanly at this size.
+    lo = int(math.ceil(opts.vmin / 20.0) * 20)
+    hi = int(math.floor(opts.vmax / 20.0) * 20)
+    ticks = list(range(lo, hi + 1, 20))
+    cb.set_ticks(ticks)
+    cb.ax.tick_params(labelsize=9, length=3, pad=2)
+    cb.outline.set_edgecolor("black")
+    cb.outline.set_linewidth(0.8)
+    # Inline "dBZ" label to the right of the bar (instead of a centered
+    # label below) so the bar + ticks + unit fit in a single horizontal
+    # band without flowing past the radar axes bottom.
+    bar_box = cax.get_position()
+    ax.text(
+        bar_box.x1 + 0.005, (bar_box.y0 + bar_box.y1) / 2,
+        "dBZ",
+        transform=ax.figure.transFigure,
+        ha="left", va="center",
+        fontsize=9, fontweight="bold", color="black",
+        zorder=11,
+    )
 
 
 def add_scale_bar(ax: Any, length_km: float = 20.0) -> None:
@@ -77,21 +99,67 @@ def add_scale_bar(ax: Any, length_km: float = 20.0) -> None:
     )
 
 
+def add_radar_marker(
+    ax: Any, lat: float, lon: float, station_id: str
+) -> None:
+    """Mark the radar site with a scope-style glyph + station label.
+
+    Drawn as a small dot inside an open ring — a "scope center" cue that
+    reads as radar at a glance and gives the eye a fixed origin for the
+    sweep. The station ID sits to the right with a white halo so it
+    survives over reflectivity returns.
+    """
+    import matplotlib.patheffects as path_effects
+
+    pc = ccrs.PlateCarree()
+    # Outer ring: open circle, 10pt diameter — the "scope" silhouette.
+    ax.plot(
+        lon, lat, marker="o", markersize=10,
+        markerfacecolor="none", markeredgecolor="black", markeredgewidth=1.2,
+        transform=pc, zorder=11,
+    )
+    # Inner dot: solid 3pt — the antenna location.
+    ax.plot(
+        lon, lat, marker="o", markersize=3,
+        markerfacecolor="black", markeredgecolor="black",
+        transform=pc, zorder=12,
+    )
+    label = ax.text(
+        lon, lat, f"  {station_id}",
+        transform=pc,
+        fontsize=8, fontweight="bold", color="black",
+        ha="left", va="center", zorder=12,
+    )
+    label.set_path_effects([
+        path_effects.Stroke(linewidth=2.5, foreground="white"),
+        path_effects.Normal(),
+    ])
+
+
 def add_north_arrow(ax: Any) -> None:
     """Place a small N + upward arrow glyph in the upper-right of the axes.
 
     Uses axes-fraction coords so position is invariant to data extent.
+    The arrow is drawn separately from the "N" label so the head points
+    *up* (toward the label) — ``annotate`` always points its arrow toward
+    ``xy``, so the previous single-call form had the head at the bottom.
     """
+    # Upward-pointing arrow: tail at 0.91, head at 0.96.
     ax.annotate(
-        "N",
-        xy=(0.95, 0.93),
-        xytext=(0.95, 0.97),
+        "",
+        xy=(0.95, 0.96),
+        xytext=(0.95, 0.91),
         xycoords="axes fraction",
         textcoords="axes fraction",
-        ha="center", va="bottom",
-        fontsize=10, fontweight="bold", color="black",
         arrowprops=dict(facecolor="black", edgecolor="black",
                         width=2, headwidth=8, headlength=8),
+        zorder=10,
+    )
+    ax.text(
+        0.95, 0.97, "N",
+        transform=ax.transAxes,
+        ha="center", va="bottom",
+        fontsize=12, fontweight="bold", color="black",
         zorder=10,
     )
 
@@ -121,6 +189,6 @@ def add_footer(
     )
     footer_ax.text(
         0.5, 0.5, text,
-        ha="center", va="center", fontsize=8, color="#333",
+        ha="center", va="center", fontsize=12, color="#333",
         transform=footer_ax.transAxes,
     )

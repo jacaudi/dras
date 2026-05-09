@@ -16,7 +16,7 @@ import cartopy.crs as ccrs  # type: ignore[import-untyped]
 import cartopy.feature as cfeature  # type: ignore[import-untyped]
 import cartopy.io.shapereader as shapereader  # type: ignore[import-untyped]
 from adjustText import adjust_text  # type: ignore[import-untyped]
-from cartopy.feature import ShapelyFeature
+from cartopy.feature import NaturalEarthFeature, ShapelyFeature
 from matplotlib.patches import Rectangle
 from matplotlib.patheffects import withStroke
 from shapely.geometry import box as _shapely_box  # type: ignore[import-untyped]
@@ -93,6 +93,83 @@ def add_counties(ax: Any) -> None:
         linewidth=0.3,
     )
     ax.add_feature(feat, zorder=2)
+
+
+# Curated peak lists, keyed by ICAO station ID. Natural Earth has no
+# usable peak dataset at this scale and a global list would clutter the
+# render with summits irrelevant to the radar's coverage area, so peaks
+# are opt-in per station. Each entry is a (lat, lon, name) tuple in
+# WGS84. Adding a new station: append a key here. Stations without an
+# entry render no peak markers.
+_PEAKS_BY_STATION: dict[str, tuple[tuple[float, float, str], ...]] = {
+    # KATX (Camano Island) covers the Cascades stratovolcano line and
+    # the Olympics; these four are the prominent summits within ~150 km.
+    "KATX": (
+        (48.7768, -121.8145, "Mt Baker"),
+        (48.1118, -121.1149, "Glacier Peak"),
+        (46.8523, -121.7603, "Mt Rainier"),
+        (47.8013, -123.7108, "Mt Olympus"),
+    ),
+}
+
+
+def add_peaks(
+    ax: Any,
+    extent: tuple[float, float, float, float],
+    station_id: str,
+) -> None:
+    """Mark this station's curated summits with a triangle + label.
+
+    Triangles are the cartographic convention for mountain peaks. Labels
+    get the same white halo as cities so they survive over reflectivity.
+    Only peaks inside ``extent`` are drawn; stations without a peak list
+    render no markers (no warning — this is opt-in).
+    """
+    peaks = _PEAKS_BY_STATION.get(station_id.upper(), ())
+    if not peaks:
+        return
+    west, east, south, north = extent
+    for lat, lon, name in peaks:
+        if not (west <= lon <= east and south <= lat <= north):
+            continue
+        ax.plot(
+            lon, lat, marker="^",
+            markersize=7,
+            markerfacecolor="#5a3a26",  # earthy brown
+            markeredgecolor="black",
+            markeredgewidth=0.7,
+            transform=ccrs.PlateCarree(),
+            zorder=6,
+        )
+        t = ax.text(
+            lon + 0.04, lat + 0.02, name,
+            fontsize=7, color="black", fontweight="bold",
+            transform=ccrs.PlateCarree(), zorder=7,
+            clip_on=True,
+            path_effects=[withStroke(linewidth=2, foreground="white")],
+        )
+        t.set_clip_path(ax.patch)
+
+
+def add_inland_lakes(ax: Any) -> None:
+    """Draw Natural Earth's NA-specific inland lakes (10m).
+
+    The global ``lakes`` layer at 10m drops anything smaller than a Great
+    Lake — Lake Washington, Lake Sammamish, Lake Pontchartrain, Lake
+    Tahoe and friends are all absent. ``lakes_north_america`` (10m) fills
+    in metro-scale water bodies that radar viewers expect to see as
+    geographic anchors. Filled with WATER_COLOR and outlined in
+    LAKE_OUTLINE so they read as water on top of the LAND polygon.
+    """
+    feat = NaturalEarthFeature(
+        category="physical",
+        name="lakes_north_america",
+        scale="10m",
+        facecolor=WATER_COLOR,
+        edgecolor=LAKE_OUTLINE,
+        linewidth=0.4,
+    )
+    ax.add_feature(feat, zorder=3)
 
 
 # Road classes we keep (filters out local/residential/unclassified). The
@@ -230,6 +307,13 @@ def add_cities(
             clip_on=True,
             path_effects=[withStroke(linewidth=2, foreground="white")],
         )
+        # Force-clip to the axes patch — clip_on alone leaks for labels
+        # whose lat/lon position projects just past the projected xlim
+        # boundary (we lock that to a square, so it's slightly tighter
+        # than the lat/lon extent at non-center latitudes). Without this,
+        # an east-edge city's offset label (lon0 + 0.04°) draws past the
+        # axes box on the right.
+        t.set_clip_path(ax.patch)
         texts.append(t)
 
     if deconflict and texts:

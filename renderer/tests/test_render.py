@@ -143,10 +143,15 @@ def test_render_options_has_new_layer_toggles() -> None:
 
 def test_render_options_defaults_match_route_defaults() -> None:
     """RenderOptions().width/.height must match the FastAPI route's
-    Query(...) defaults (1000×1000) so direct library use produces the
-    same dimensions as the HTTP API. Prior drift here gave library
-    callers an 800x864 PNG while the route produced 1000x1080.
+    Query(...) defaults so direct library use produces the same
+    dimensions as the HTTP API. Prior drift here gave library callers
+    an 800x864 PNG while the route produced 1000x1080.
+
+    All three layers (RenderOptions, RenderRequest, FastAPI Query)
+    pull from the DEFAULT_WIDTH / DEFAULT_HEIGHT constants in render.py
+    so this test asserts the constants are the active source of truth.
     """
+    from dras_renderer.render import DEFAULT_HEIGHT, DEFAULT_WIDTH
     opts = RenderOptions()
-    assert opts.width == 1000
-    assert opts.height == 1000
+    assert opts.width == DEFAULT_WIDTH
+    assert opts.height == DEFAULT_HEIGHT
