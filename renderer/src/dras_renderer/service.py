@@ -11,7 +11,13 @@ from cachetools import LRUCache
 from dras_renderer.cache import RenderCache
 from dras_renderer.decode import DecodedScan, decode_level2_archive
 from dras_renderer.metrics import S3_ERRORS_TOTAL
-from dras_renderer.render import RenderOptions, render_base_reflectivity
+from dras_renderer.render import (
+    DEFAULT_HEIGHT,
+    DEFAULT_RANGE_KM,
+    DEFAULT_WIDTH,
+    RenderOptions,
+    render_base_reflectivity,
+)
 from dras_renderer.s3 import S3Client, S3Error
 from dras_renderer.version import VERSION
 
@@ -20,9 +26,9 @@ from dras_renderer.version import VERSION
 class RenderRequest:
     station: str
     product: str = "base_reflectivity"
-    range_km: float = 230.0
-    width: int = 800
-    height: int = 800
+    range_km: float = DEFAULT_RANGE_KM
+    width: int = DEFAULT_WIDTH
+    height: int = DEFAULT_HEIGHT
     # Optional view-center override. None means "center on the radar".
     center_lat: float | None = None
     center_lon: float | None = None

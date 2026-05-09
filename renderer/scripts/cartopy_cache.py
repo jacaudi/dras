@@ -30,8 +30,20 @@ import cartopy.io.shapereader as shp  # type: ignore[import-untyped]
 # render.py — adding a layer there without warming it here means first
 # render in production downloads it, which on read-only/uid-mismatch
 # pods fails outright.
-_PHYSICAL_50M = ("STATES", "COASTLINE", "LAKES", "BORDERS")
+_PHYSICAL_50M = ("STATES", "COASTLINE", "BORDERS")
+# 10m physical features used by basemap. LAND backs the high-res land
+# mask in add_land_water_fill; LAKES needs 10m resolution because 50m
+# drops every inland lake smaller than a Great Lake (e.g. Lake
+# Washington vanishes at 50m).
+_PHYSICAL_10M = ("LAND", "LAKES")
 _POPULATED_PLACES_RES = "10m"
+# 10m shapefiles loaded directly via shapereader / NaturalEarthFeature
+# (no cfeature class). Listed as (category, name) pairs.
+_RAW_10M = (
+    ("cultural", "admin_2_counties_lakes"),  # basemap.add_counties
+    ("cultural", "roads"),                   # basemap.add_roads
+    ("physical", "lakes_north_america"),     # basemap.add_inland_lakes
+)
 
 
 def main() -> int:
@@ -40,12 +52,20 @@ def main() -> int:
         feature = getattr(cf, name).with_scale("50m")
         counts[name.lower()] = len(list(feature.geometries()))
 
+    for name in _PHYSICAL_10M:
+        feature = getattr(cf, name).with_scale("10m")
+        counts[f"{name.lower()}_10m"] = len(list(feature.geometries()))
+
     cities_path = shp.natural_earth(
         category="cultural",
         name="populated_places",
         resolution=_POPULATED_PLACES_RES,
     )
     counts["cities"] = len(list(shp.Reader(cities_path).records()))
+
+    for category, name in _RAW_10M:
+        path = shp.natural_earth(category=category, name=name, resolution="10m")
+        counts[name] = len(list(shp.Reader(path).records()))
 
     if not all(counts.values()):
         empty = [name for name, n in counts.items() if not n]

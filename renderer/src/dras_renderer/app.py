@@ -17,6 +17,13 @@ from starlette.responses import Response
 from dras_renderer.cache import RenderCache
 from dras_renderer.config import Config
 from dras_renderer.metrics import REGISTRY, RENDER_DURATION, REQUESTS_TOTAL
+from dras_renderer.render import (
+    DEFAULT_HEIGHT,
+    DEFAULT_RANGE_KM,
+    DEFAULT_RANGE_MAX_KM,
+    DEFAULT_RANGE_MIN_KM,
+    DEFAULT_WIDTH,
+)
 from dras_renderer.s3 import S3Client
 from dras_renderer.service import (
     RenderRequest,
@@ -69,13 +76,17 @@ def build_app(config: Config | None = None) -> FastAPI:
         request: Request,
         station: str,
         product: str = Query("base_reflectivity"),
-        range_km: float = Query(230.0, ge=10.0, le=460.0),
+        range_km: float = Query(
+            DEFAULT_RANGE_KM,
+            ge=DEFAULT_RANGE_MIN_KM,
+            le=DEFAULT_RANGE_MAX_KM,
+        ),
         width: int = Query(
-            1000, ge=200, le=4000,
+            DEFAULT_WIDTH, ge=200, le=4000,
             description="Returned PNG width in pixels.",
         ),
         height: int = Query(
-            1000, ge=200, le=4000,
+            DEFAULT_HEIGHT, ge=200, le=4000,
             description=(
                 "Radar plot height in pixels. The returned PNG total "
                 "height equals this value plus an ~8% footer strip "
