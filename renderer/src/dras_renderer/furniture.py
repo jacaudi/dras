@@ -50,8 +50,11 @@ def add_colorbar(ax: Any, opts: RenderOptions) -> None:
     ticks = list(range(lo, hi + 1, 20))
     cb.set_ticks(ticks)
     cb.ax.tick_params(labelsize=9, length=3, pad=2)
-    cb.outline.set_edgecolor("black")
-    cb.outline.set_linewidth(0.8)
+    # cb.outline is typed `Spine | None`; the matplotlib stubs flag
+    # method calls as "Spine not callable [operator]". At runtime it's
+    # always a Spine on a freshly constructed colorbar — silence mypy.
+    cb.outline.set_edgecolor("black")  # type: ignore[operator]
+    cb.outline.set_linewidth(0.8)  # type: ignore[operator]
     # Inline "dBZ" label to the right of the bar (instead of a centered
     # label below) so the bar + ticks + unit fit in a single horizontal
     # band without flowing past the radar axes bottom.
