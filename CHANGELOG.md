@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.13.0](https://github.com/jacaudi/dras/compare/v2.12.0...v2.13.0) (2026-05-09)
+
+### Bug Fixes
+
+* **renderer:** silence mypy on colorbar outline attribute access ([408971f](https://github.com/jacaudi/dras/commit/408971fa96ec81cda18460b6558d7bfe9af481f7))
+
+
+### Features
+
+* **renderer:** cartographic upgrades — peaks, inland lakes, scope marker, refined colorbar ([fb240e5](https://github.com/jacaudi/dras/commit/fb240e5b7da2faffd99fcb5177859d50c866837c))
+
 ## [2.12.0](https://github.com/jacaudi/dras/compare/v2.11.0...v2.12.0) (2026-05-06)
 
 ### Bug Fixes
