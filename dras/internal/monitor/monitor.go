@@ -92,6 +92,13 @@ func (m *Monitor) fetchAndReportRadarData(ctx context.Context, stationIDs []stri
 }
 
 // processStation handles the processing of a single radar station.
+//
+// The image source is invoked lazily — only when a notification will
+// carry the freshly-rendered image (first run, or a VCP change). The
+// previous "fetch every poll, attach on change" pattern made the
+// renderer absorb a request per station per CheckInterval (~12/hr per
+// station with the 5 min default) just to discard most of them. Only
+// poll the renderer when the result will reach a user.
 func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	stationLogger := slog.Default().With("station", stationID)
 	stationLogger.Debug("Fetching radar data")
@@ -99,11 +106,6 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	if err != nil {
 		return fmt.Errorf("error fetching radar data for station %s: %w", stationID, err)
 	}
-
-	// Poll and store the latest radar image so it can be attached to the
-	// next change notification. Image fetch failures are logged but do not
-	// fail the whole poll.
-	radarImage := m.fetchRadarImage(ctx, stationID, stationLogger)
 
 	// Check if we need to initialize or if this is first run
 	m.mu.Lock()
@@ -124,6 +126,10 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 		if m.config.DryRun {
 			stationLogger.Debug(fmt.Sprintf("Would send startup notification: %s", initialMessage))
 		} else {
+			// First run always carries the freshly-rendered image so
+			// the user has visual context the moment the monitor
+			// comes online.
+			radarImage := m.fetchRadarImage(ctx, stationID, stationLogger)
 			attachment := m.attachmentForStation(stationID, radarImage)
 			if err := m.notifyService.SendNotificationWithAttachment(ctx, "DRAS Startup", initialMessage, attachment); err != nil {
 				return fmt.Errorf("failed to send startup notification for station %s: %w", stationID, err)
@@ -143,31 +149,40 @@ func (m *Monitor) processStation(ctx context.Context, stationID string) error {
 	alertConfig := m.config.AlertConfig
 
 	changed, changeMessage := radar.CompareData(lastData, newRadarData, alertConfig)
-	if changed {
-		slog.Info("Radar data changed",
-			"station", stationID,
-			"station_name", newRadarData.Name,
-			"change", changeMessage,
-		)
-
-		vcpChanged := lastData.VCP != newRadarData.VCP
-
-		if m.config.DryRun {
-			stationLogger.Debug(fmt.Sprintf("Would send change notification: %s", changeMessage))
-		} else {
-			title := fmt.Sprintf("%s Update", stationID)
-			attachment := m.attachmentForChange(stationID, vcpChanged, radarImage, stationLogger)
-			if err := m.notifyService.SendNotificationWithAttachment(ctx, title, changeMessage, attachment); err != nil {
-				return fmt.Errorf("failed to send change notification for station %s: %w", stationID, err)
-			}
-			stationLogger.Info("Change notification sent successfully")
-		}
-		m.mu.Lock()
-		m.radarDataMap[stationID]["last"] = newRadarData
-		m.mu.Unlock()
-	} else {
+	if !changed {
 		stationLogger.Debug("No changes detected in radar data")
+		return nil
 	}
+
+	slog.Info("Radar data changed",
+		"station", stationID,
+		"station_name", newRadarData.Name,
+		"change", changeMessage,
+	)
+
+	vcpChanged := lastData.VCP != newRadarData.VCP
+
+	if m.config.DryRun {
+		stationLogger.Debug(fmt.Sprintf("Would send change notification: %s", changeMessage))
+	} else {
+		// Only invoke the image source when the notification will
+		// actually carry an attachment (currently: VCP changes only).
+		// Other changes — power source, mode without VCP shift, etc.
+		// — reach the user as text-only and don't justify a render.
+		var radarImage *image.Image
+		if vcpChanged {
+			radarImage = m.fetchRadarImage(ctx, stationID, stationLogger)
+		}
+		title := fmt.Sprintf("%s Update", stationID)
+		attachment := m.attachmentForChange(stationID, vcpChanged, radarImage, stationLogger)
+		if err := m.notifyService.SendNotificationWithAttachment(ctx, title, changeMessage, attachment); err != nil {
+			return fmt.Errorf("failed to send change notification for station %s: %w", stationID, err)
+		}
+		stationLogger.Info("Change notification sent successfully")
+	}
+	m.mu.Lock()
+	m.radarDataMap[stationID]["last"] = newRadarData
+	m.mu.Unlock()
 
 	return nil
 }

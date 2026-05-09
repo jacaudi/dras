@@ -272,6 +272,130 @@ func TestNonVCPChangeOmitsAttachment(t *testing.T) {
 	}
 }
 
+// TestNoChangePollSkipsImageSource pins the lazy-fetch behavior: a poll
+// where nothing in the radar data changed must not invoke the image
+// source. The previous always-poll-the-renderer pattern absorbed one
+// renderer request per station per CheckInterval — at the 5-min default
+// that's 12 wasted renders per hour per station.
+func TestNoChangePollSkipsImageSource(t *testing.T) {
+	var imageRequests int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&imageRequests, 1)
+		w.Header().Set("Content-Type", "image/gif")
+		w.Write([]byte("img"))
+	}))
+	defer server.Close()
+
+	imgSvc := image.New(image.Config{URLTemplate: server.URL + "/{station}.gif"})
+
+	radarMock := radar.NewMockDataFetcher()
+	radarMock.SetResponse("KATX", &radar.Data{
+		Name: "Seattle", VCP: "R31", Mode: "Clear Air",
+		Status: "Online", OperabilityStatus: "Normal",
+		PowerSource: "Utility", GenState: "Off",
+	})
+
+	notifyMock := notify.NewMockNotifier()
+	cfg := &config.Config{
+		DryRun:        false,
+		CheckInterval: time.Minute,
+		AlertConfig:   radar.AlertConfig{VCP: true},
+	}
+
+	m := New(radarMock, notifyMock, imgSvc, cfg)
+	ctx := context.Background()
+
+	// First poll seeds the cache and triggers the startup notification —
+	// startup always fetches one image.
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("first processStation() error: %v", err)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 1 {
+		t.Fatalf("after first poll: imageRequests = %d, want 1 (startup)", got)
+	}
+
+	// Second poll: identical radar data. No change detected, no
+	// notification fired, and crucially — no renderer call.
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("second processStation() error: %v", err)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 1 {
+		t.Errorf("after no-change poll: imageRequests = %d, want 1 (no extra fetch)", got)
+	}
+	if got := len(notifyMock.GetNotifications()); got != 1 {
+		t.Errorf("after no-change poll: notifications = %d, want 1 (only startup)", got)
+	}
+
+	// Third poll: same again. Still nothing.
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("third processStation() error: %v", err)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 1 {
+		t.Errorf("after second no-change poll: imageRequests = %d, want 1", got)
+	}
+}
+
+// TestNonVCPChangePollSkipsImageSource pins the same lazy-fetch behavior
+// for the more subtle case of a non-VCP change: power-source flips don't
+// carry an attachment, so they must not invoke the renderer either.
+func TestNonVCPChangePollSkipsImageSource(t *testing.T) {
+	var imageRequests int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&imageRequests, 1)
+		w.Header().Set("Content-Type", "image/gif")
+		w.Write([]byte("img"))
+	}))
+	defer server.Close()
+
+	imgSvc := image.New(image.Config{URLTemplate: server.URL + "/{station}.gif"})
+
+	radarMock := radar.NewMockDataFetcher()
+	radarMock.SetResponse("KATX", &radar.Data{
+		Name: "Seattle", VCP: "R31", Mode: "Clear Air",
+		Status: "Online", OperabilityStatus: "Normal",
+		PowerSource: "Utility", GenState: "Off",
+	})
+
+	notifyMock := notify.NewMockNotifier()
+	cfg := &config.Config{
+		DryRun:        false,
+		CheckInterval: time.Minute,
+		AlertConfig:   radar.AlertConfig{VCP: true, PowerSource: true},
+	}
+
+	m := New(radarMock, notifyMock, imgSvc, cfg)
+	ctx := context.Background()
+
+	// Startup poll — 1 fetch.
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("first processStation() error: %v", err)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 1 {
+		t.Fatalf("after first poll: imageRequests = %d, want 1", got)
+	}
+
+	// Change power source only — VCP unchanged, no attachment expected,
+	// no renderer call expected.
+	radarMock.SetResponse("KATX", &radar.Data{
+		Name: "Seattle", VCP: "R31", Mode: "Clear Air",
+		Status: "Online", OperabilityStatus: "Normal",
+		PowerSource: "Generator", GenState: "On",
+	})
+	if err := m.processStation(ctx, "KATX"); err != nil {
+		t.Fatalf("second processStation() error: %v", err)
+	}
+	if got := atomic.LoadInt64(&imageRequests); got != 1 {
+		t.Errorf("after non-VCP change: imageRequests = %d, want 1 (no extra fetch)", got)
+	}
+	notifs := notifyMock.GetNotifications()
+	if len(notifs) != 2 {
+		t.Fatalf("expected 2 notifications, got %d", len(notifs))
+	}
+	if notifs[1].Attachment != nil {
+		t.Errorf("non-VCP change should not have attachment, got %+v", notifs[1].Attachment)
+	}
+}
+
 // TestRendererModeDeliversAttachment exercises the full happy path with the
 // renderer.Client image source. A renderer stub returns a unique PNG per
 // request so we can assert which body was attached.
