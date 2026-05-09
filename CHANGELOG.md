@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.13.1](https://github.com/jacaudi/dras/compare/v2.13.0...v2.13.1) (2026-05-09)
+
+### Bug Fixes
+
+* **monitor:** fetch radar image only on change, not every poll ([d9a3782](https://github.com/jacaudi/dras/commit/d9a3782a9261a052bd5557f8b792a88edf9675dc))
+
 ## [2.13.0](https://github.com/jacaudi/dras/compare/v2.12.0...v2.13.0) (2026-05-09)
 
 ### Bug Fixes
