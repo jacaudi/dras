@@ -2,27 +2,27 @@ package radar
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
 
 func TestGetMode(t *testing.T) {
 	tests := []struct {
-		name           string
-		vcp            string
-		expectedMode   string
-		expectUnknown  bool
-		fallbackSubstr string
+		name          string
+		vcp           VCP
+		expectedMode  RadarMode
+		expectUnknown bool
 	}{
-		{name: "R31", vcp: "R31", expectedMode: "Clear Air"},
-		{name: "R35", vcp: "R35", expectedMode: "Clear Air"},
-		{name: "R12", vcp: "R12", expectedMode: "Precipitation"},
-		{name: "R112", vcp: "R112", expectedMode: "Precipitation"},
-		{name: "R212", vcp: "R212", expectedMode: "Precipitation"},
-		{name: "R215", vcp: "R215", expectedMode: "Precipitation"},
-		{name: "unknown_R99", vcp: "R99", expectUnknown: true, fallbackSubstr: `"R99"`},
-		{name: "empty", vcp: "", expectUnknown: true, fallbackSubstr: `""`},
-		{name: "whitespace", vcp: " ", expectUnknown: true, fallbackSubstr: `" "`},
+		{name: "R31", vcp: VCPR31, expectedMode: ModeClearAir},
+		{name: "R35", vcp: VCPR35, expectedMode: ModeClearAir},
+		{name: "R12", vcp: VCPR12, expectedMode: ModePrecipitation},
+		{name: "R112", vcp: VCPR112, expectedMode: ModePrecipitation},
+		{name: "R212", vcp: VCPR212, expectedMode: ModePrecipitation},
+		{name: "R215", vcp: VCPR215, expectedMode: ModePrecipitation},
+		{name: "unknown_R99", vcp: "R99", expectUnknown: true},
+		{name: "empty", vcp: "", expectUnknown: true},
+		{name: "whitespace", vcp: " ", expectUnknown: true},
 	}
 
 	for _, tt := range tests {
@@ -33,11 +33,8 @@ func TestGetMode(t *testing.T) {
 				if !errors.Is(err, ErrUnknownVCP) {
 					t.Fatalf("expected ErrUnknownVCP for VCP %q, got %v", tt.vcp, err)
 				}
-				if !strings.Contains(mode, "Unknown") {
-					t.Errorf("expected fallback mode label to contain \"Unknown\" for VCP %q, got %q", tt.vcp, mode)
-				}
-				if !strings.Contains(mode, tt.fallbackSubstr) {
-					t.Errorf("expected fallback mode label to contain %s for VCP %q, got %q", tt.fallbackSubstr, tt.vcp, mode)
+				if mode != ModeUnknown {
+					t.Errorf("expected ModeUnknown for VCP %q, got %q", tt.vcp, mode)
 				}
 				return
 			}
@@ -56,12 +53,12 @@ func TestGetMode(t *testing.T) {
 
 func TestGetVCPInfo(t *testing.T) {
 	t.Run("known", func(t *testing.T) {
-		info, err := GetVCPInfo("R212")
+		info, err := GetVCPInfo(VCPR212)
 		if err != nil {
 			t.Fatalf("unexpected error for R212: %v", err)
 		}
-		if info.Mode != "Precipitation" {
-			t.Errorf("Mode = %q, want %q", info.Mode, "Precipitation")
+		if info.Mode != ModePrecipitation {
+			t.Errorf("Mode = %q, want %q", info.Mode, ModePrecipitation)
 		}
 		if !strings.Contains(info.Description, "SAILS") {
 			t.Errorf("Description = %q, expected to mention SAILS", info.Description)
@@ -73,8 +70,8 @@ func TestGetVCPInfo(t *testing.T) {
 		if !errors.Is(err, ErrUnknownVCP) {
 			t.Fatalf("expected ErrUnknownVCP, got %v", err)
 		}
-		if !strings.Contains(info.Mode, "Unknown") {
-			t.Errorf("Mode = %q, expected to contain \"Unknown\"", info.Mode)
+		if info.Mode != ModeUnknown {
+			t.Errorf("Mode = %q, expected ModeUnknown", info.Mode)
 		}
 		if !strings.Contains(info.Description, "R999") {
 			t.Errorf("Description = %q, expected to contain raw VCP %q", info.Description, "R999")
@@ -146,38 +143,58 @@ func TestValidateStationID(t *testing.T) {
 	}
 }
 
-func TestSimplifyGeneratorState(t *testing.T) {
+func TestParseGeneratorState(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected string
-		hasError bool
+		name        string
+		input       string
+		want        GeneratorState
+		expectError bool
 	}{
-		{"Switched to Auxiliary Power|Utility PWR Available|Generator On", "On", false},
-		{"Switched to Auxiliary Power|Generator On", "On", false},
-		{"Utility PWR Available|Generator On", "On", false},
-		{"Utility PWR Available", "Off", false},
-		{"Unknown State", "", true},
+		// Known good — all four canonical raw strings collapse to On / Off.
+		{name: "all_three_tokens_with_generator_on", input: "Switched to Auxiliary Power|Utility PWR Available|Generator On", want: GenStateOn},
+		{name: "aux_power_plus_generator_on", input: "Switched to Auxiliary Power|Generator On", want: GenStateOn},
+		{name: "utility_plus_generator_on", input: "Utility PWR Available|Generator On", want: GenStateOn},
+		{name: "utility_only", input: "Utility PWR Available", want: GenStateOff},
+
+		// Token-set robustness — order shouldn't matter (Option 3 logic).
+		{name: "reversed_order", input: "Generator On|Utility PWR Available", want: GenStateOn},
+
+		// Soft-fail surface area — empty + novel + ambiguous inputs land on
+		// GenStateUnknown with ErrUnknownGeneratorState wrapping. This is the
+		// regression coverage for issue #129; the previous implementation
+		// returned ("", errors.New("unknown input")) and the caller aborted.
+		{name: "empty", input: "", want: GenStateUnknown, expectError: true},
+		{name: "totally_novel", input: "Cold Fusion Reactor Active", want: GenStateUnknown, expectError: true},
+		// Utility token present but with extra unknown tokens → not safe to
+		// classify as Off (might mean "running on generator but also..."),
+		// so soft-fail.
+		{name: "utility_with_extra_tokens", input: "Utility PWR Available|Mystery State", want: GenStateUnknown, expectError: true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			result, err := simplifyGeneratorState(tt.input)
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseGeneratorState(tt.input)
 
-			if tt.hasError {
-				if err == nil {
-					t.Errorf("Expected error for input %q, but got none", tt.input)
-				}
-				return
+			if got != tt.want {
+				t.Errorf("ParseGeneratorState(%q) state = %q, want %q", tt.input, got, tt.want)
 			}
 
-			if err != nil {
-				t.Errorf("Unexpected error for input %q: %v", tt.input, err)
-				return
-			}
-
-			if result != tt.expected {
-				t.Errorf("For input %q, expected %q, got %q", tt.input, tt.expected, result)
+			switch {
+			case tt.expectError && !errors.Is(err, ErrUnknownGeneratorState):
+				t.Errorf("ParseGeneratorState(%q) err = %v, want errors.Is(err, ErrUnknownGeneratorState)", tt.input, err)
+			case !tt.expectError && err != nil:
+				t.Errorf("ParseGeneratorState(%q) unexpected err = %v", tt.input, err)
 			}
 		})
 	}
+}
+
+// ExampleParseGeneratorState documents the typical happy-path call shape and
+// is exercised by `go test` so the example never rots (§8.3 of
+// go-standards.md: "A broken example is a broken release.").
+func ExampleParseGeneratorState() {
+	state, _ := ParseGeneratorState("Utility PWR Available|Generator On")
+	// state implements fmt.Stringer; %s prints the underlying string.
+	fmt.Println(state)
+	// Output: On
 }

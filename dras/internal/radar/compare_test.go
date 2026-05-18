@@ -160,6 +160,114 @@ func TestCompareData(t *testing.T) {
 		}
 	})
 
+	// Skip-Unknown behavior (issue #129). A degraded NWS payload produces
+	// <Type>Unknown values for the affected fields; the comparator must not
+	// fire a change notification for a flip TO an Unknown sentinel, even
+	// though the strings differ. Cache update is gated on `changed` in the
+	// caller, so this leaves the cache holding the last known-good value
+	// and a subsequent recovery to that same value produces a clean
+	// no-change.
+	t.Run("skips flip to Unknown on every field", func(t *testing.T) {
+		degraded := &Data{
+			Name:              "KATX",
+			VCP:               VCPUnknown,
+			Mode:              ModeUnknown,
+			Status:            StatusUnknown,
+			OperabilityStatus: OpStatusUnknown,
+			PowerSource:       PowerSourceUnknown,
+			GenState:          GenStateUnknown,
+		}
+
+		alertConfig := AlertConfig{
+			VCP:         true,
+			Status:      true,
+			Operability: true,
+			PowerSource: true,
+			GenState:    true,
+		}
+
+		changed, message := CompareData(oldData, degraded, alertConfig)
+		if changed {
+			t.Errorf("Expected no changes for OK→Unknown flip on every field, got changed=true, message=%q", message)
+		}
+		if message != "" {
+			t.Errorf("Expected empty message for OK→Unknown flip, got %q", message)
+		}
+	})
+
+	t.Run("flip FROM Unknown is reported (recovery)", func(t *testing.T) {
+		// First-run / post-recovery: previous cached value was Unknown
+		// (e.g. cache seeded during a degraded poll). A subsequent known
+		// value IS a genuine state-clarification and should fire.
+		degraded := &Data{
+			Name:              "KATX",
+			VCP:               VCPUnknown,
+			Mode:              ModeUnknown,
+			Status:            StatusUnknown,
+			OperabilityStatus: OpStatusUnknown,
+			PowerSource:       PowerSourceUnknown,
+			GenState:          GenStateUnknown,
+		}
+
+		recovered := &Data{
+			Name:              "KATX",
+			VCP:               VCPR12,
+			Mode:              ModePrecipitation,
+			Status:            "Operate",
+			OperabilityStatus: "RDA - On-line",
+			PowerSource:       PowerSourceUtility,
+			GenState:          GenStateOff,
+		}
+
+		alertConfig := AlertConfig{
+			VCP:         true,
+			Status:      true,
+			Operability: true,
+			PowerSource: true,
+			GenState:    true,
+		}
+
+		changed, message := CompareData(degraded, recovered, alertConfig)
+		if !changed {
+			t.Error("Expected change to be reported for Unknown→OK recovery")
+		}
+		// VCP path: oldData=Unknown, newData=R12 known → "Precipitation Mode Active".
+		if !strings.Contains(message, "Precipitation Mode Active") {
+			t.Errorf("Expected precipitation message on recovery, got %q", message)
+		}
+		// Status: Unknown → Operate is reported as a normal flip.
+		if !strings.Contains(message, "status changed from Unknown to Operate") {
+			t.Errorf("Expected status change message on recovery, got %q", message)
+		}
+	})
+
+	t.Run("partial degradation: change on known field only", func(t *testing.T) {
+		// Only VCP flips to Unknown; other fields stay known and unchanged.
+		// Expect: no change reported (VCP path skips Unknown, others equal).
+		partial := &Data{
+			Name:              "KATX",
+			VCP:               VCPUnknown,
+			Mode:              ModeUnknown,
+			Status:            "Online",
+			OperabilityStatus: "Normal",
+			PowerSource:       PowerSourceUtility,
+			GenState:          GenStateOff,
+		}
+
+		alertConfig := AlertConfig{
+			VCP:         true,
+			Status:      true,
+			Operability: true,
+			PowerSource: true,
+			GenState:    true,
+		}
+
+		changed, message := CompareData(oldData, partial, alertConfig)
+		if changed {
+			t.Errorf("Expected no change for partial degradation (VCP→Unknown, others stable), got changed=true message=%q", message)
+		}
+	})
+
 	t.Run("ignores disabled alerts", func(t *testing.T) {
 		newData := &Data{
 			Name:              "KATX",
