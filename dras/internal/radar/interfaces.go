@@ -49,12 +49,12 @@ func (m *MockDataFetcher) FetchData(stationID string) (*Data, error) {
 	// Default response if none set
 	return &Data{
 		Name:              stationID,
-		VCP:               "R31",
-		Mode:              "Clear Air",
-		Status:            "Online",
-		OperabilityStatus: "Normal",
-		PowerSource:       "Utility",
-		GenState:          "Off",
+		VCP:               VCPR31,
+		Mode:              ModeClearAir,
+		Status:            StatusOperate,
+		OperabilityStatus: OpStatusOnline,
+		PowerSource:       PowerSourceUtility,
+		GenState:          GenStateOff,
 	}, nil
 }
 

@@ -7,7 +7,7 @@ import (
 
 // BenchmarkGetMode tests performance of VCP to mode conversion
 func BenchmarkGetMode(b *testing.B) {
-	vcps := []string{"R31", "R35", "R12", "R112", "R212", "R215"}
+	vcps := []VCP{VCPR31, VCPR35, VCPR12, VCPR112, VCPR212, VCPR215}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
