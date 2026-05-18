@@ -1,5 +1,7 @@
 # Changelog
 
+## [2.14.0](https://github.com/jacaudi/dras/compare/v2.13.1...v2.14.0) (2026-05-18)
+
 ## [2.13.1](https://github.com/jacaudi/dras/compare/v2.13.0...v2.13.1) (2026-05-09)
 
 ### Bug Fixes
