@@ -83,6 +83,23 @@ const (
 
 func (o OperabilityStatus) String() string { return string(o) }
 
+// AlarmSummary is the RDA alarm-summary string reported by NWS. It is the
+// finest-grained of the three health fields (status / operabilityStatus /
+// alarmSummary): where operabilityStatus flags THAT something is wrong,
+// alarmSummary names WHICH subsystem. Observed values include "No Alarms"
+// (the healthy value), "Communication", "RDA Control", "Tower / Utilities".
+type AlarmSummary string
+
+const (
+	AlarmSummaryNone          AlarmSummary = "No Alarms"
+	AlarmSummaryCommunication AlarmSummary = "Communication"
+	AlarmSummaryRDAControl    AlarmSummary = "RDA Control"
+	AlarmSummaryTowerUtil     AlarmSummary = "Tower / Utilities"
+	AlarmSummaryUnknown       AlarmSummary = "Unknown"
+)
+
+func (a AlarmSummary) String() string { return string(a) }
+
 // PowerSource indicates whether the radar is running on utility power or its
 // backup generator.
 type PowerSource string
@@ -216,6 +233,16 @@ func ParseOperabilityStatus(s string) OperabilityStatus {
 	return OperabilityStatus(s)
 }
 
+// ParseAlarmSummary wraps a raw alarm-summary string in AlarmSummary, mapping
+// empty input to AlarmSummaryUnknown. Non-empty values pass through verbatim
+// so an unenumerated NWS value survives for forensic logging.
+func ParseAlarmSummary(s string) AlarmSummary {
+	if s == "" {
+		return AlarmSummaryUnknown
+	}
+	return AlarmSummary(s)
+}
+
 // ParsePowerSource wraps a raw power-source string in PowerSource, mapping
 // empty input to PowerSourceUnknown.
 func ParsePowerSource(s string) PowerSource {
@@ -269,6 +296,7 @@ type Data struct {
 	Mode              RadarMode
 	Status            RadarStatus
 	OperabilityStatus OperabilityStatus
+	AlarmSummary      AlarmSummary
 	PowerSource       PowerSource
 	GenState          GeneratorState
 }
@@ -335,6 +363,7 @@ func (s *Service) FetchData(stationID string) (*Data, error) {
 		Mode:              mode,
 		Status:            ParseRadarStatus(radarResponse.RDA.Properties.Status),
 		OperabilityStatus: ParseOperabilityStatus(radarResponse.RDA.Properties.OperabilityStatus),
+		AlarmSummary:      ParseAlarmSummary(radarResponse.RDA.Properties.AlarmSummary),
 		PowerSource:       ParsePowerSource(radarResponse.Performance.Properties.PowerSource),
 		GenState:          genState,
 	}, nil

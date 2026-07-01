@@ -268,6 +268,52 @@ func TestCompareData(t *testing.T) {
 		}
 	})
 
+	// Functional coverage for the alarmSummary field (issue #128). Same shape
+	// as the existing five comparators: fire on a real flip, stay silent on a
+	// flip to the Unknown sentinel, and honor the enable toggle.
+	t.Run("alarm summary change", func(t *testing.T) {
+		newData := &Data{
+			Name:              "KATX",
+			VCP:               "R31",
+			Mode:              "Clear Air",
+			Status:            "Online",
+			OperabilityStatus: "Normal",
+			AlarmSummary:      AlarmSummaryCommunication,
+			PowerSource:       "Utility",
+			GenState:          "Off",
+		}
+
+		alertConfig := AlertConfig{AlarmSummary: true}
+
+		changed, message := CompareData(oldData, newData, alertConfig)
+		if !changed {
+			t.Error("Expected alarm-summary change to be detected")
+		}
+		if !strings.Contains(message, "Alarm summary changed from  to Communication") {
+			t.Errorf("Expected alarm-summary change message, got %q", message)
+		}
+	})
+
+	t.Run("alarm summary skips flip to Unknown", func(t *testing.T) {
+		base := &Data{Name: "KATX", AlarmSummary: AlarmSummaryNone}
+		degraded := &Data{Name: "KATX", AlarmSummary: AlarmSummaryUnknown}
+
+		changed, message := CompareData(base, degraded, AlertConfig{AlarmSummary: true})
+		if changed {
+			t.Errorf("Expected no change for alarm-summary flip to Unknown, got message=%q", message)
+		}
+	})
+
+	t.Run("alarm summary respects disabled toggle", func(t *testing.T) {
+		base := &Data{Name: "KATX", AlarmSummary: AlarmSummaryNone}
+		alarming := &Data{Name: "KATX", AlarmSummary: AlarmSummaryCommunication}
+
+		changed, _ := CompareData(base, alarming, AlertConfig{AlarmSummary: false})
+		if changed {
+			t.Error("Expected no change when ALERT_ALARM_SUMMARY is off")
+		}
+	})
+
 	t.Run("ignores disabled alerts", func(t *testing.T) {
 		newData := &Data{
 			Name:              "KATX",

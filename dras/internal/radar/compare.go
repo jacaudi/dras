@@ -8,11 +8,12 @@ import (
 
 // AlertConfig holds configuration for which events to alert on.
 type AlertConfig struct {
-	VCP         bool
-	Status      bool
-	Operability bool
-	PowerSource bool
-	GenState    bool
+	VCP          bool
+	Status       bool
+	Operability  bool
+	AlarmSummary bool
+	PowerSource  bool
+	GenState     bool
 }
 
 // CompareData compares old and new radar data and returns whether any
@@ -57,6 +58,10 @@ func CompareData(oldData, newData *Data, alertConfig AlertConfig) (bool, string)
 
 	if alertConfig.Operability && newData.OperabilityStatus != OpStatusUnknown && oldData.OperabilityStatus != newData.OperabilityStatus {
 		changes = append(changes, fmt.Sprintf("Radar operability changed from %s to %s", oldData.OperabilityStatus, newData.OperabilityStatus))
+	}
+
+	if alertConfig.AlarmSummary && newData.AlarmSummary != AlarmSummaryUnknown && oldData.AlarmSummary != newData.AlarmSummary {
+		changes = append(changes, fmt.Sprintf("Alarm summary changed from %s to %s", oldData.AlarmSummary, newData.AlarmSummary))
 	}
 
 	if alertConfig.PowerSource && newData.PowerSource != PowerSourceUnknown && oldData.PowerSource != newData.PowerSource {

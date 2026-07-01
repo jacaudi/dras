@@ -189,6 +189,34 @@ func TestParseGeneratorState(t *testing.T) {
 	}
 }
 
+// TestParseAlarmSummary is the unit coverage for the alarmSummary parser
+// (issue #128). Empty input maps to AlarmSummaryUnknown (the skip-Unknown
+// sentinel); every non-empty value passes through verbatim so an
+// unenumerated NWS value survives for forensic logging.
+func TestParseAlarmSummary(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  AlarmSummary
+	}{
+		{name: "empty_maps_to_unknown", input: "", want: AlarmSummaryUnknown},
+		{name: "healthy", input: "No Alarms", want: AlarmSummaryNone},
+		{name: "communication", input: "Communication", want: AlarmSummaryCommunication},
+		{name: "rda_control", input: "RDA Control", want: AlarmSummaryRDAControl},
+		{name: "tower_utilities", input: "Tower / Utilities", want: AlarmSummaryTowerUtil},
+		// Unenumerated value passes through verbatim (not squashed to Unknown).
+		{name: "novel_value_passthrough", input: "Pedestal", want: AlarmSummary("Pedestal")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ParseAlarmSummary(tt.input); got != tt.want {
+				t.Errorf("ParseAlarmSummary(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 // ExampleParseGeneratorState documents the typical happy-path call shape and
 // is exercised by `go test` so the example never rots (§8.3 of
 // go-standards.md: "A broken example is a broken release.").

@@ -20,6 +20,7 @@ func TestLoad(t *testing.T) {
 		"ALERT_VCP",
 		"ALERT_STATUS",
 		"ALERT_OPERABILITY",
+		"ALERT_ALARM_SUMMARY",
 		"ALERT_POWER_SOURCE",
 		"ALERT_GEN_STATE",
 		"RADAR_IMAGE_ENABLED",
@@ -136,6 +137,42 @@ func TestLoad(t *testing.T) {
 		}
 		if !cfg.AlertConfig.Status {
 			t.Errorf("Expected Status alerts to be true")
+		}
+	})
+
+	// Integration coverage for the ALERT_ALARM_SUMMARY env var (issue #128):
+	// defaults off, opt-in via env, and rejects a non-bool value.
+	t.Run("ALERT_ALARM_SUMMARY defaults to false", func(t *testing.T) {
+		clearEnv(t)
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() failed: %v", err)
+		}
+		if cfg.AlertConfig.AlarmSummary {
+			t.Error("Expected AlarmSummary alerts to be false by default")
+		}
+	})
+
+	t.Run("ALERT_ALARM_SUMMARY opt-in via env", func(t *testing.T) {
+		clearEnv(t)
+		t.Setenv("ALERT_ALARM_SUMMARY", "true")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load() failed: %v", err)
+		}
+		if !cfg.AlertConfig.AlarmSummary {
+			t.Error("Expected AlarmSummary alerts to be true when ALERT_ALARM_SUMMARY=true")
+		}
+	})
+
+	t.Run("handles invalid ALERT_ALARM_SUMMARY value", func(t *testing.T) {
+		clearEnv(t)
+		t.Setenv("ALERT_ALARM_SUMMARY", "maybe")
+
+		if _, err := Load(); err == nil {
+			t.Error("Expected error for invalid ALERT_ALARM_SUMMARY value")
 		}
 	})
 

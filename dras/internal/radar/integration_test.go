@@ -49,6 +49,12 @@ func TestRealNWSIntegration(t *testing.T) {
 					t.Errorf("Expected status for %s, got empty string", stationID)
 				}
 
+				// alarmSummary always parses to at least AlarmSummaryUnknown,
+				// so the field must never be empty (issue #128).
+				if data.AlarmSummary == "" {
+					t.Errorf("Expected alarm summary for %s, got empty string (want a value or %q)", stationID, AlarmSummaryUnknown)
+				}
+
 				// Test that VCP can be converted to mode
 				mode, err := GetMode(data.VCP)
 				if err != nil {
@@ -59,8 +65,8 @@ func TestRealNWSIntegration(t *testing.T) {
 					}
 				}
 
-				t.Logf("Station %s: Name=%s, VCP=%s, Mode=%s, Status=%s, PowerSource=%s",
-					stationID, data.Name, data.VCP, data.Mode, data.Status, data.PowerSource)
+				t.Logf("Station %s: Name=%s, VCP=%s, Mode=%s, Status=%s, AlarmSummary=%s, PowerSource=%s",
+					stationID, data.Name, data.VCP, data.Mode, data.Status, data.AlarmSummary, data.PowerSource)
 			})
 		}
 	})

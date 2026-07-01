@@ -68,6 +68,17 @@ func BenchmarkCompareData(b *testing.B) {
 	}
 }
 
+// BenchmarkParseAlarmSummary is the performance coverage for the alarmSummary
+// parser (issue #128). It should be allocation-free for the pass-through path
+// since the parser only converts a string to a named string type.
+func BenchmarkParseAlarmSummary(b *testing.B) {
+	inputs := []string{"No Alarms", "Communication", "RDA Control", "", "Pedestal"}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = ParseAlarmSummary(inputs[i%len(inputs)])
+	}
+}
+
 // BenchmarkConcurrentRadarProcessing simulates concurrent radar data processing
 func BenchmarkConcurrentRadarProcessing(b *testing.B) {
 	stationIDs := []string{"KATX", "KRAX", "KBGM", "KTLX", "KFFC"}
