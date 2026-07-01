@@ -95,6 +95,16 @@ func (c *Client) Fetch(ctx context.Context, stationID string) (*image.Image, err
 	if resp.StatusCode != http.StatusOK {
 		var errBody errorBody
 		if jsonErr := json.Unmarshal(body, &errBody); jsonErr == nil && errBody.Error != "" {
+			// A "decode_failed" whose detail names the missing message-31
+			// records is the benign mid-write case (issue #122): the upstream
+			// NEXRAD volume was fetched before it finished writing, so it has
+			// no reflectivity records yet. Tag it with image.ErrScanIncomplete
+			// so the monitor logs an INFO skip instead of a WARN. The detail
+			// text is preserved in the message for forensics.
+			if isScanIncomplete(errBody) {
+				return nil, fmt.Errorf("renderer returned %d: %s (%s): %w",
+					resp.StatusCode, errBody.Error, errBody.Detail, image.ErrScanIncomplete)
+			}
 			return nil, fmt.Errorf("renderer returned %d: %s (%s)",
 				resp.StatusCode, errBody.Error, errBody.Detail)
 		}
@@ -130,6 +140,18 @@ func (c *Client) Fetch(ctx context.Context, stationID string) (*image.Image, err
 		Filename:    filename,
 		FetchedAt:   scanTime,
 	}, nil
+}
+
+// isScanIncomplete reports whether a renderer error response is the benign
+// "upstream volume fetched mid-write" case: a decode_failed whose detail names
+// the missing message-31 records. Py-ART raises this as a ValueError with the
+// message "No MSG31 records found, cannot read file", which the renderer
+// surfaces verbatim in errBody.Detail. Match is case-insensitive on the stable
+// substring so a wording tweak or capitalization change upstream doesn't turn
+// the skip back into a WARN. Issue #122.
+func isScanIncomplete(b errorBody) bool {
+	return b.Error == "decode_failed" &&
+		strings.Contains(strings.ToLower(b.Detail), "no msg31 records")
 }
 
 // Latest always returns no cached image. The renderer is the source of truth;
