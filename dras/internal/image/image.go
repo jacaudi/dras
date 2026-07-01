@@ -44,6 +44,15 @@ type Image struct {
 	FetchedAt   time.Time
 }
 
+// ErrScanIncomplete is a soft-fail signal from a Source: the upstream radar
+// volume was fetched mid-write, so the scan is not yet renderable (e.g. the
+// renderer decoded the Level II archive and found no MSG31 / message-31
+// reflectivity records yet). This is an accepted "upstream-not-ready" skip,
+// not a true failure — the next poll picks up the completed volume. Callers
+// should log it at INFO and continue rather than treating it as a WARN.
+// Detect with errors.Is(err, image.ErrScanIncomplete). Issue #122.
+var ErrScanIncomplete = errors.New("scan not yet complete")
+
 // Source supplies radar images for stations. Implementations decide where
 // images come from (downloaded GIFs, rendered Level II data, etc).
 type Source interface {

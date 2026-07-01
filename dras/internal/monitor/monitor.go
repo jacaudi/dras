@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -196,7 +197,15 @@ func (m *Monitor) fetchRadarImage(ctx context.Context, stationID string, station
 
 	img, err := m.imageService.Fetch(ctx, stationID)
 	if err != nil {
-		stationLogger.Warn(fmt.Sprintf("Failed to fetch radar image: %v", err))
+		// A mid-write upstream volume (no MSG31 records yet) is an accepted
+		// upstream-not-ready skip, not a failure — the next poll picks up the
+		// completed scan. Log it at INFO so it doesn't masquerade as a WARN in
+		// dashboards/alerts. Everything else stays a WARN. Issue #122.
+		if errors.Is(err, image.ErrScanIncomplete) {
+			stationLogger.Info(fmt.Sprintf("Skipping radar image; upstream scan not yet complete: %v", err))
+		} else {
+			stationLogger.Warn(fmt.Sprintf("Failed to fetch radar image: %v", err))
+		}
 		return nil
 	}
 	return img
