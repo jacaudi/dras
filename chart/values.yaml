@@ -89,10 +89,15 @@ controllers:
           - name: http
             containerPort: 8080
         resources:
-          # 1.5Gi limit covers Py-ART peak (~1.1Gi) on busy stations.
-          # See PR #104 history for profiling notes.
-          requests: { cpu: 100m, memory: 512Mi }
-          limits:   { memory: 1536Mi }
+          # Py-ART peak is ~1.1Gi on busy stations (PR #104 profiling), but a
+          # long-running matplotlib/Cartopy process accretes headroom pressure
+          # and the old 1536Mi limit OOMKilled (exit 137) roughly every 4h in
+          # production over multi-day runs (issue #125). 3Gi is deliberately
+          # generous to stop the OOMKills; requests raised to 1Gi so the
+          # scheduler reserves a realistic floor rather than the 512Mi that
+          # never reflected steady-state usage.
+          requests: { cpu: 100m, memory: 1Gi }
+          limits:   { memory: 3Gi }
         probes:
           # Gate on this: dras doesn't start until /healthz is 200.
           # ~5s × 30 = 150s budget covers cold Py-ART/matplotlib
@@ -158,6 +163,35 @@ persistence:
         renderer:
           - path: /tmp
             subPath: renderer
+
+  # Writable Cartopy cache for the renderer (issue #125).
+  #
+  # Cartopy resolves Natural Earth shapefiles under ~/.local/share/cartopy
+  # (HOME=/home/renderer). The renderer image bakes and read-only-verifies
+  # that cache under uid 65532 at build time (Dockerfile, issues #107/#108),
+  # so warmed layers already render out of the box. What the baked cache
+  # cannot do is absorb a *cache miss* — a Cartopy/Natural-Earth version bump
+  # that needs a layer not in the pre-warm list, or a future render.py layer
+  # added without updating scripts/cartopy_cache.py. On the read-only baked
+  # dir that miss triggers a download to ~/.local/share/cartopy and 500s with
+  # PermissionError (EACCES) under runAsUser: 65532.
+  #
+  # This emptyDir gives that path a writable overlay so a miss self-heals by
+  # downloading into the pod's cache instead of failing the request. Cache is
+  # per-pod-lifetime; switch type to a PVC if you want it to survive restarts.
+  #
+  # NOTE: mounting here shadows the image's baked cache, so the first render
+  # in a fresh pod re-downloads the Natural Earth layers (needs egress to the
+  # Natural Earth CDN). In an air-gapped cluster set enabled: false and rely
+  # on the baked read-only cache instead.
+  cartopy-cache:
+    enabled: true
+    type: emptyDir
+    sizeLimit: 256Mi
+    advancedMounts:
+      dras:
+        renderer:
+          - path: /home/renderer/.local/share/cartopy
 
 # ── app-template required top-level stubs ────────────────────────────────
 # app-template/common iterates these keys directly; they must be present as

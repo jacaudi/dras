@@ -127,3 +127,41 @@ tests:
       - equal:
           path: spec.template.spec.securityContext.runAsUser
           value: 65532
+
+  # issue #125 — writable Cartopy cache so a cache miss self-heals instead of
+  # 500ing with PermissionError under the read-only baked cache + uid 65532.
+  - it: renderer sidecar mounts a writable Cartopy cache
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].volumeMounts
+          content:
+            mountPath: /home/renderer/.local/share/cartopy
+            name: cartopy-cache
+
+  - it: pod-scoped emptyDir volume backs the Cartopy cache mount
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: cartopy-cache
+            emptyDir:
+              sizeLimit: 256Mi
+
+  # issue #125 — raised renderer memory to stop ~4h OOMKills over multi-day runs.
+  - it: renderer sidecar has raised memory (3Gi limit, 1Gi request)
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 3Gi
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.requests.memory
+          value: 1Gi
