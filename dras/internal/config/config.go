@@ -80,6 +80,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	cfg.AlertConfig.AlarmSummary, err = parseBoolEnv("ALERT_ALARM_SUMMARY", "false")
+	if err != nil {
+		return nil, err
+	}
+
 	cfg.AlertConfig.PowerSource, err = parseBoolEnv("ALERT_POWER_SOURCE", "false")
 	if err != nil {
 		return nil, err
@@ -273,6 +278,9 @@ func (c *Config) String() string {
 	}
 	if c.AlertConfig.Operability {
 		alertTypes = append(alertTypes, "Operability")
+	}
+	if c.AlertConfig.AlarmSummary {
+		alertTypes = append(alertTypes, "AlarmSummary")
 	}
 	if c.AlertConfig.PowerSource {
 		alertTypes = append(alertTypes, "PowerSource")

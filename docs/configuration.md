@@ -42,6 +42,7 @@ Each governs whether a change in that field triggers a notification.
 | `ALERT_VCP` | `true` | Volume Coverage Pattern change (clear-air ↔ precipitation, etc.). |
 | `ALERT_STATUS` | `false` | Operational status change. |
 | `ALERT_OPERABILITY` | `false` | Operability status change. |
+| `ALERT_ALARM_SUMMARY` | `false` | Alarm-summary change (which subsystem is alarming, e.g. `No Alarms` ↔ `Communication`). |
 | `ALERT_POWER_SOURCE` | `false` | Power-source change (utility ↔ generator). |
 | `ALERT_GEN_STATE` | `false` | Generator-state change. |
 
