@@ -1,7 +1,7 @@
 [project]
 name = "dras-renderer"
 version = "0.0.0"  # actual version is injected at build time from the git tag
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 description = "NEXRAD Level II rendering service for dras"
 readme = "README.md"
 license = { text = "MIT" }
