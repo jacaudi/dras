@@ -6,7 +6,8 @@
       "releaseRules": [
         { "breaking": true, "release": "minor" },
         { "type": "refactor", "release": "minor" },
-        { "type": "chore", "scope": "deps", "release": "patch" }
+        { "type": "chore", "scope": "deps", "release": "patch" },
+        { "type": "deps", "release": "patch" }
       ]
     }],
     ["@semantic-release/release-notes-generator", {
@@ -20,6 +21,7 @@
           { "type": "docs",     "section": "Documentation" },
           { "type": "build",    "section": "Build System" },
           { "type": "ci",       "section": "Continuous Integration" },
+          { "type": "deps",     "section": "Dependencies" },
           { "type": "chore",    "scope": "deps", "section": "Dependencies" },
           { "type": "chore",    "section": "Chores" },
           { "type": "test",     "section": "Tests" },
